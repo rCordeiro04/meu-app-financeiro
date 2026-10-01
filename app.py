@@ -26,9 +26,8 @@ def carregar_controles():
     if os.path.exists(ARQUIVO_CONTROLES):
         with open(ARQUIVO_CONTROLES, 'r', encoding='utf-8') as f:
             return json.load(f)
-    # Contas padrão iniciais
     return {
-        "contas_pagas": {"Apartamento/Aluguel": False, "Condomínio": False, "Energia Elétrica": False, "Internet": False, "Fatura do Cartão": False},
+        "contas_pagas": {},
         "metas_investimento": {"Reserva de Emergência": 0.0, "CDB / Tesouro Direto": 0.0, "Ações / FIIs": 0.0}
     }
 
@@ -220,10 +219,10 @@ elif aba_selecionada == "Lançamentos":
                 st.success("Dados importados e salvos com sucesso!")
                 st.rerun()
 
-# --- ABA 3: CONTROLES (NOVA ESTRUTURA) ---
+# --- ABA 3: CONTROLES ---
 elif aba_selecionada == "Controles":
     st.title("⚙️ Controles")
-    st.write("Acompanhe o pagamento das suas contas e planeie os seus investimentos.")
+    st.write("Acompanhe o pagamento das contas e planeie os investimentos por mês.")
 
     controles = carregar_controles()
 
@@ -231,32 +230,48 @@ elif aba_selecionada == "Controles":
 
     with aba_contas:
         st.subheader("Checklist de Pagamentos")
-        st.info("Marque as contas que já foram pagas neste mês. As alterações são salvas automaticamente.")
         
-        # Cria as caixas de seleção dinamicamente
-        for conta, status in controles["contas_pagas"].items():
-            novo_status = st.checkbox(conta, value=status, key=f"chk_{conta}")
-            controles["contas_pagas"][conta] = novo_status
+        # Filtro de Mês para os Controles
+        mes_atual_str = date.today().strftime('%m/%Y')
+        mes_input = st.text_input("Mês de Referência (MM/AAAA)", value=mes_atual_str)
+        
+        if mes_input not in controles["contas_pagas"]:
+            # Inicializa as contas específicas solicitadas para o novo mês
+            controles["contas_pagas"][mes_input] = {
+                "Apartamento": False, 
+                "Evolução de obra": False, 
+                "Moto/Carro": False, 
+                "Faculdade": False
+            }
+            salvar_controles(controles)
+
+        st.info(f"Marque as contas pagas referentes a **{mes_input}**. Salvo automaticamente.")
+        
+        # Exibe as caixas de seleção para o mês escolhido
+        contas_do_mes = controles["contas_pagas"][mes_input]
+        for conta, status in list(contas_do_mes.items()):
+            novo_status = st.checkbox(conta, value=status, key=f"chk_{mes_input}_{conta}")
+            controles["contas_pagas"][mes_input][conta] = novo_status
             
         salvar_controles(controles)
 
-        # Barra de Progresso Visual
-        total_contas = len(controles["contas_pagas"])
-        contas_pagas = sum(controles["contas_pagas"].values())
+        # Barra de Progresso Visual do Mês
+        total_contas = len(contas_do_mes)
+        contas_pagas = sum(contas_do_mes.values())
         
         if total_contas > 0:
             percentual = contas_pagas / total_contas
-            st.progress(percentual, text=f"Progresso: {contas_pagas} de {total_contas} contas pagas")
+            st.progress(percentual, text=f"Progresso de {mes_input}: {contas_pagas} de {total_contas} contas pagas")
             
             if percentual == 1.0:
-                st.success("🎉 Parabéns! Todas as contas fixas foram pagas este mês.")
+                st.success(f"🎉 Parabéns! Todas as contas de {mes_input} foram quitadas.")
 
-        # Botão para adicionar nova conta na lista
+        # Opção de adicionar nova conta personalizada se necessário
         st.divider()
-        nova_conta = st.text_input("Adicionar nova conta à lista:")
+        nova_conta = st.text_input("Adicionar outra conta a este mês:")
         if st.button("Adicionar Conta", use_container_width=True):
-            if nova_conta and nova_conta not in controles["contas_pagas"]:
-                controles["contas_pagas"][nova_conta] = False
+            if nova_conta and nova_conta not in controles["contas_pagas"][mes_input]:
+                controles["contas_pagas"][mes_input][nova_conta] = False
                 salvar_controles(controles)
                 st.rerun()
 
@@ -264,18 +279,15 @@ elif aba_selecionada == "Controles":
         st.subheader("Metas de Investimento")
         st.write("Defina o valor que pretende guardar para cada objetivo financeiro.")
         
-        # Cria os campos de preenchimento dinamicamente
         for invest, valor in controles["metas_investimento"].items():
             novo_valor = st.number_input(f"Meta para {invest} (R$)", value=float(valor), min_value=0.0, step=50.0, format="%.2f", key=f"inv_{invest}")
             controles["metas_investimento"][invest] = novo_valor
             
         salvar_controles(controles)
 
-        # Cálculo do total de investimentos
         total_investimentos = sum(controles["metas_investimento"].values())
         st.info(f"🎯 O seu objetivo total de investimentos é: **R$ {formatar_moeda(total_investimentos)}**")
 
-        # Botão para adicionar novo investimento
         st.divider()
         novo_invest = st.text_input("Adicionar nova categoria de investimento:")
         if st.button("Adicionar Categoria", use_container_width=True):
