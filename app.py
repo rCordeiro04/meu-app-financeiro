@@ -61,12 +61,10 @@ if aba_selecionada == "Painel":
         total_entradas = df[df['Tipo'] == 'Receita']['Valor'].sum()
         total_saidas = df[df['Tipo'] == 'Despesa']['Valor'].sum()
         liquido = total_entradas - total_saidas
-        guardado = liquido if liquido > 0 else 0.0
 
-        # --- DESIGN DOS BALÕES (CARDS) EM HTML/CSS ---
+        # --- DESIGN DOS 3 BALÕES (CARDS) ---
         html_cards = f"""
         <style>
-        /* Container que permite colocar um ao lado do outro e deslizar no celular */
         .cards-wrapper {{
             display: flex;
             flex-direction: row;
@@ -74,18 +72,16 @@ if aba_selecionada == "Painel":
             gap: 12px;
             margin-top: 15px;
             margin-bottom: 25px;
-            overflow-x: auto; /* Permite rolar para o lado no celular */
+            overflow-x: auto;
             padding-bottom: 12px; 
             padding-top: 5px;
         }}
-        /* Esconde a barra de rolagem para ficar mais bonito */
         .cards-wrapper::-webkit-scrollbar {{ display: none; }}
         .cards-wrapper {{ -ms-overflow-style: none; scrollbar-width: none; }}
         
-        /* Design individual de cada balão */
         .card-custom {{
             flex: 1;
-            min-width: 145px; /* Garante que o card não esmague o texto no celular */
+            min-width: 100px; /* Ajustado para caberem os 3 perfeitamente */
             background-color: #ffffff;
             border-radius: 20px;
             padding: 20px 10px;
@@ -95,10 +91,8 @@ if aba_selecionada == "Painel":
             align-items: center;
             justify-content: center;
             border: 1px solid #f1f3f5;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }}
         
-        /* Ajuste automático de cores caso o celular esteja no Modo Escuro */
         @media (prefers-color-scheme: dark) {{
             .card-custom {{
                 background-color: #1e1e1e;
@@ -107,34 +101,17 @@ if aba_selecionada == "Painel":
             }}
         }}
 
-        .card-custom:hover {{
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.12);
-        }}
-        .card-icon {{
-            font-size: 28px;
-            margin-bottom: 8px;
-        }}
+        .card-icon {{ font-size: 28px; margin-bottom: 8px; }}
         .card-title {{
-            font-size: 13px;
-            color: #888;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 5px;
-            text-align: center;
+            font-size: 13px; color: #888; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            margin-bottom: 5px; text-align: center;
         }}
-        .card-value {{
-            font-size: 22px;
-            font-weight: 800;
-            text-align: center;
-        }}
+        .card-value {{ font-size: 20px; font-weight: 800; text-align: center; }}
         
-        /* Cores dos números */
-        .text-green {{ color: #20c997; }} /* Verde moderno */
-        .text-red {{ color: #ff6b6b; }}   /* Vermelho suave */
-        .text-blue {{ color: #339af0; }}  /* Azul vibrante */
-        .text-purple {{ color: #b197fc; }} /* Roxo / Lilás */
+        .text-green {{ color: #20c997; }}
+        .text-red {{ color: #ff6b6b; }}
+        .text-blue {{ color: #339af0; }}
         </style>
 
         <div class="cards-wrapper">
@@ -153,23 +130,56 @@ if aba_selecionada == "Painel":
                 <div class="card-title">Líquido</div>
                 <div class="card-value text-blue">R$ {formatar_moeda(liquido)}</div>
             </div>
-            <div class="card-custom">
-                <div class="card-icon">💰</div>
-                <div class="card-title">Guardado</div>
-                <div class="card-value text-purple">R$ {formatar_moeda(guardado)}</div>
-            </div>
         </div>
         """
-        
-        # Renderiza os cards bonitos na tela
         st.markdown(html_cards, unsafe_allow_html=True)
         
         st.divider()
 
-        if total_saidas > 0:
-            st.subheader("Distribuição de Despesas")
-            fig = px.pie(df[df['Tipo'] == 'Despesa'], values='Valor', names='Categoria', hole=0.5)
-            st.plotly_chart(fig, use_container_width=True)
+        # --- SEÇÃO DOS GRÁFICOS DE ROSCA ---
+        st.subheader("Análise Visual")
+        
+        # Cria duas colunas para os gráficos
+        col1, col2 = st.columns(2)
+
+        # GRÁFICO 1: Despesas por Categoria
+        with col1:
+            st.markdown("**Despesas por Categoria**")
+            df_despesas = df[df['Tipo'] == 'Despesa']
+            if not df_despesas.empty and df_despesas['Valor'].sum() > 0:
+                fig1 = px.pie(df_despesas, values='Valor', names='Categoria', hole=0.5)
+                # Configurações para ficar bom no celular: sem legenda externa, texto dentro do gráfico
+                fig1.update_traces(textposition='inside', textinfo='percent+label')
+                fig1.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
+                st.plotly_chart(fig1, use_container_width=True)
+            else:
+                st.info("Sem saídas registradas.")
+
+        # GRÁFICO 2: Renda vs Gastos
+        with col2:
+            st.markdown("**Renda vs Gastos**")
+            if total_entradas > 0 or total_saidas > 0:
+                df_comparacao = pd.DataFrame({
+                    "Tipo": ["Entradas", "Saídas"],
+                    "Valor": [total_entradas, total_saidas]
+                })
+                # Filtra valores zero para o gráfico não ficar deformado
+                df_comparacao = df_comparacao[df_comparacao['Valor'] > 0]
+                
+                # Gráfico com cores fixas (Verde para Entradas, Vermelho para Saídas)
+                fig2 = px.pie(
+                    df_comparacao, 
+                    values='Valor', 
+                    names='Tipo', 
+                    hole=0.5,
+                    color='Tipo',
+                    color_discrete_map={"Entradas": "#20c997", "Saídas": "#ff6b6b"}
+                )
+                fig2.update_traces(textposition='inside', textinfo='percent+label')
+                fig2.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
+                st.plotly_chart(fig2, use_container_width=True)
+            else:
+                st.info("Sem dados para comparar.")
 
 # --- ABA 2: LANÇAMENTOS ---
 elif aba_selecionada == "Lançamentos":
