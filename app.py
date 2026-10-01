@@ -43,22 +43,27 @@ with st.sidebar:
 if aba_selecionada == "Painel":
     st.title("📊 Painel")
     
-    df = st.session_state['dados'].copy()
+    df_completo = st.session_state['dados'].copy()
     
-    if df.empty:
+    if df_completo.empty:
         st.info("Nenhum dado registrado ainda. Vá até 'Lançamentos' e faça o primeiro registro para ver os gráficos!")
     else:
-        df['Data'] = pd.to_datetime(df['Data'])
-        df['MesAno'] = df['Data'].dt.strftime('%m/%Y')
+        # Prepara a base de dados temporal
+        df_completo['Data'] = pd.to_datetime(df_completo['Data'])
+        df_completo = df_completo.sort_values('Data') # Ordena cronologicamente
+        df_completo['MesAno'] = df_completo['Data'].dt.strftime('%m/%Y')
         
-        meses_disponiveis = ["Todos os Meses"] + sorted(list(df['MesAno'].unique()), reverse=True)
-        mes_selecionado = st.selectbox("📅 Filtrar por Mês/Ano", meses_disponiveis)
+        # O filtro de mês atua apenas nas métricas pontuais e gráficos de rosca
+        meses_disponiveis = ["Todos os Meses"] + sorted(list(df_completo['MesAno'].unique()), reverse=True)
+        mes_selecionado = st.selectbox("📅 Filtrar Mês (Balões e Gráficos de Rosca)", meses_disponiveis)
         
         if mes_selecionado != "Todos os Meses":
-            df = df[df['MesAno'] == mes_selecionado]
+            df_filtrado = df_completo[df_completo['MesAno'] == mes_selecionado]
+        else:
+            df_filtrado = df_completo.copy()
             
-        total_entradas = df[df['Tipo'] == 'Receita']['Valor'].sum()
-        total_saidas = df[df['Tipo'] == 'Despesa']['Valor'].sum()
+        total_entradas = df_filtrado[df_filtrado['Tipo'] == 'Receita']['Valor'].sum()
+        total_saidas = df_filtrado[df_filtrado['Tipo'] == 'Despesa']['Valor'].sum()
         liquido = total_entradas - total_saidas
 
         # --- DESIGN DOS BALÕES ---
@@ -94,69 +99,87 @@ if aba_selecionada == "Painel":
         """
         st.markdown(html_cards, unsafe_allow_html=True)
 
-        # --- ESTILIZAÇÃO SOFISTICADA PARA OS GRÁFICOS ---
+        # --- ESTILIZAÇÃO SOFISTICADA DOS GRÁFICOS (CARTÕES) ---
         st.markdown("""
         <style>
-        /* Transforma as colunas dos gráficos em cartões elegantes com sombra */
         [data-testid="stColumn"] {
-            background-color: #ffffff;
-            border-radius: 20px;
-            padding: 20px 10px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-            border: 1px solid #f0f2f6;
-            margin-bottom: 15px;
+            background-color: #ffffff; border-radius: 20px; padding: 20px 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); border: 1px solid #f0f2f6; margin-bottom: 15px;
         }
         @media (prefers-color-scheme: dark) {
             [data-testid="stColumn"] {
-                background-color: #1a1a1a;
-                border: 1px solid #2d2d2d;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+                background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
             }
         }
         </style>
         """, unsafe_allow_html=True)
         
+        # --- LINHA 1: GRÁFICOS DE ROSCA ---
         col1, col2 = st.columns(2)
 
         with col1:
-            # Título corrigido com espaçamento adequado
             st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Despesas</h4>", unsafe_allow_html=True)
-            df_despesas = df[df['Tipo'] == 'Despesa']
+            df_despesas = df_filtrado[df_filtrado['Tipo'] == 'Despesa']
             if not df_despesas.empty and df_despesas['Valor'].sum() > 0:
                 fig1 = px.pie(df_despesas, values='Valor', names='Categoria', hole=0.65)
                 fig1.update_traces(textposition='inside', textinfo='percent', hoverinfo='label+percent+value')
-                fig1.update_layout(
-                    showlegend=False, 
-                    margin=dict(t=10, b=10, l=10, r=10),
-                    height=220,
-                    paper_bgcolor='rgba(0,0,0,0)', # Fundo transparente para herdar a cor do cartão
-                    plot_bgcolor='rgba(0,0,0,0)'
-                )
+                fig1.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10), height=220, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig1, use_container_width=True)
             else:
-                st.info("Sem saídas.")
+                st.info("Sem saídas no período.")
 
         with col2:
             st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Renda vs Gastos</h4>", unsafe_allow_html=True)
             if total_entradas > 0 or total_saidas > 0:
                 df_comparacao = pd.DataFrame({"Tipo": ["Entradas", "Saídas"], "Valor": [total_entradas, total_saidas]})
                 df_comparacao = df_comparacao[df_comparacao['Valor'] > 0]
-                
-                fig2 = px.pie(
-                    df_comparacao, values='Valor', names='Tipo', hole=0.65,
-                    color='Tipo', color_discrete_map={"Entradas": "#20c997", "Saídas": "#ff6b6b"}
-                )
+                fig2 = px.pie(df_comparacao, values='Valor', names='Tipo', hole=0.65, color='Tipo', color_discrete_map={"Entradas": "#20c997", "Saídas": "#ff6b6b"})
                 fig2.update_traces(textposition='inside', textinfo='percent', hoverinfo='label+percent+value')
-                fig2.update_layout(
-                    showlegend=False, 
-                    margin=dict(t=10, b=10, l=10, r=10),
-                    height=220,
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)'
-                )
+                fig2.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10), height=220, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig2, use_container_width=True)
             else:
-                st.info("Sem dados.")
+                st.info("Sem dados no período.")
+
+        st.markdown("<h3 style='font-size: 18px; margin-top: 20px; margin-bottom: 5px; color: #555;'>Evolução Histórica</h3>", unsafe_allow_html=True)
+
+        # --- LINHA 2: GRÁFICOS DE COLUNAS (TODOS OS MESES) ---
+        col3, col4 = st.columns(2)
+
+        with col3:
+            st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Comparativo Anual</h4>", unsafe_allow_html=True)
+            # Agrupa os dados de todos os meses, ignorando o filtro lá de cima
+            df_agrupado = df_completo.groupby(['MesAno', 'Tipo'], as_index=False)['Valor'].sum()
+            df_agrupado['Tipo'] = df_agrupado['Tipo'].replace({'Receita': 'Entradas', 'Despesa': 'Saídas'})
+            
+            fig3 = px.bar(df_agrupado, x='MesAno', y='Valor', color='Tipo', barmode='group', color_discrete_map={"Entradas": "#20c997", "Saídas": "#ff6b6b"})
+            fig3.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(t=10, b=10, l=0, r=0), height=240,
+                legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5, title=""),
+                xaxis_title="", yaxis_title=""
+            )
+            fig3.update_xaxes(showgrid=False)
+            fig3.update_yaxes(showgrid=True, gridcolor='rgba(200,200,200,0.1)')
+            st.plotly_chart(fig3, use_container_width=True)
+
+        with col4:
+            st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Evolução do Guardado</h4>", unsafe_allow_html=True)
+            # Calcula o que foi guardado (Entradas - Saídas) de todos os meses
+            df_pivot = df_completo.pivot_table(index='MesAno', columns='Tipo', values='Valor', aggfunc='sum', fill_value=0).reset_index()
+            if 'Receita' not in df_pivot.columns: df_pivot['Receita'] = 0
+            if 'Despesa' not in df_pivot.columns: df_pivot['Despesa'] = 0
+            df_pivot['Guardado'] = df_pivot['Receita'] - df_pivot['Despesa']
+            
+            fig4 = px.bar(df_pivot, x='MesAno', y='Guardado')
+            fig4.update_traces(marker_color='#b197fc') # Roxo sofisticado
+            fig4.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(t=10, b=10, l=0, r=0), height=240,
+                xaxis_title="", yaxis_title=""
+            )
+            fig4.update_xaxes(showgrid=False)
+            fig4.update_yaxes(showgrid=True, gridcolor='rgba(200,200,200,0.1)')
+            st.plotly_chart(fig4, use_container_width=True)
 
 # --- ABA 2: LANÇAMENTOS ---
 elif aba_selecionada == "Lançamentos":
