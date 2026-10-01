@@ -29,10 +29,10 @@ with st.sidebar:
     
     aba_selecionada = option_menu(
         menu_title="Meu Financeiro",
-        options=["Painel", "Lançamentos", "Controles", "Banco de Dados"],
-        icons=["bar-chart-line-fill", "plus-circle-fill", "sliders", "database-fill"],
+        options=["Painel", "Lançamentos", "Controles"], # Removido o Banco de Dados daqui
+        icons=["bar-chart-line-fill", "plus-circle-fill", "sliders"],
         menu_icon="wallet-fill",
-        default_index=1, # Abre na aba de Lançamentos para você testar a gravação
+        default_index=1, 
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
@@ -179,12 +179,12 @@ if aba_selecionada == "Painel":
             fig4.update_yaxes(showgrid=True, gridcolor='rgba(200,200,200,0.1)')
             st.plotly_chart(fig4, use_container_width=True)
 
-# --- ABA 2: LANÇAMENTOS ---
+# --- ABA 2: LANÇAMENTOS (AGORA COM BANCO DE DADOS) ---
 elif aba_selecionada == "Lançamentos":
     st.title("➕ Lançamentos")
-    st.write("Registre suas movimentações financeiras.")
+    st.write("Registre e consulte suas movimentações financeiras.")
 
-    aba_entrada, aba_saida = st.tabs(["Entradas 📈", "Saídas 📉"])
+    aba_entrada, aba_saida, aba_banco = st.tabs(["Entradas 📈", "Saídas 📉", "Banco de Dados 🗄️"])
 
     with aba_entrada:
         with st.form("form_entrada"):
@@ -216,33 +216,31 @@ elif aba_selecionada == "Lançamentos":
                     salvar_dados(df)
                     st.success(f"✅ Saída salva fisicamente!")
 
+    with aba_banco:
+        st.subheader("Consultar Registos")
+        df_banco = carregar_dados()
+        
+        if not df_banco.empty:
+            st.dataframe(df_banco, use_container_width=True, hide_index=True)
+        else:
+            st.info("Nenhum dado registrado ainda.")
+
+        st.divider()
+        st.subheader("📤 Exportar Dados")
+        csv = df_banco.to_csv(index=False).encode('utf-8')
+        st.download_button(label="📥 Baixar Planilha CSV", data=csv, file_name="meu_controle_financeiro.csv", mime="text/csv", use_container_width=True)
+
+        st.divider()
+        st.subheader("📥 Importar Dados")
+        arquivo_upload = st.file_uploader("Escolha um arquivo .CSV", type=["csv"])
+        if arquivo_upload is not None:
+            df_importado = pd.read_csv(arquivo_upload)
+            if st.button("Substituir dados atuais pela planilha", use_container_width=True):
+                salvar_dados(df_importado)
+                st.success("Dados importados e salvos com sucesso!")
+                st.rerun()
+
 # --- ABA 3: CONTROLES ---
 elif aba_selecionada == "Controles":
     st.title("⚙️ Controles")
     st.info("🚧 Tela em desenvolvimento.")
-
-# --- ABA 4: BANCO DE DADOS ---
-elif aba_selecionada == "Banco de Dados":
-    st.title("🗄️ Banco de Dados")
-    
-    df = carregar_dados()
-    
-    if not df.empty:
-        st.dataframe(df, use_container_width=True, hide_index=True)
-    else:
-        st.info("Nenhum dado registrado ainda.")
-
-    st.divider()
-    st.subheader("📤 Exportar")
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button(label="📥 Baixar Planilha CSV", data=csv, file_name="meu_controle_financeiro.csv", mime="text/csv", use_container_width=True)
-
-    st.divider()
-    st.subheader("📥 Importar")
-    arquivo_upload = st.file_uploader("Escolha um arquivo .CSV", type=["csv"])
-    if arquivo_upload is not None:
-        df_importado = pd.read_csv(arquivo_upload)
-        if st.button("Substituir dados atuais", use_container_width=True):
-            salvar_dados(df_importado)
-            st.success("Dados importados e salvos com sucesso!")
-            st.rerun()
