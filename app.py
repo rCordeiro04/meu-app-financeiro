@@ -29,8 +29,8 @@ with st.sidebar:
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
             "nav-link": {
-                "font-size": "16px", "text-align": "left", "margin": "15px 0px",     
-                "padding": "15px", "border-radius": "0px", "--hover-color": "#f0f2f6"
+                "font-size": "16px", "text-align": "left", "margin": "10px 0px",     
+                "padding": "12px", "border-radius": "0px", "--hover-color": "#f0f2f6"
             },
             "nav-link-selected": {
                 "background-color": "#28a745", "color": "white", 
@@ -57,57 +57,56 @@ if aba_selecionada == "Painel":
         if mes_selecionado != "Todos os Meses":
             df = df[df['MesAno'] == mes_selecionado]
             
-        # Cálculos das métricas
         total_entradas = df[df['Tipo'] == 'Receita']['Valor'].sum()
         total_saidas = df[df['Tipo'] == 'Despesa']['Valor'].sum()
         liquido = total_entradas - total_saidas
 
-        # --- DESIGN DOS 3 BALÕES (CARDS) ---
+        # --- DESIGN DOS 3 BALÕES (MAIS COMPACTOS E ELEGANTES) ---
         html_cards = f"""
         <style>
         .cards-wrapper {{
             display: flex;
             flex-direction: row;
             justify-content: space-between;
-            gap: 12px;
-            margin-top: 15px;
-            margin-bottom: 25px;
+            gap: 10px;
+            margin-top: 10px;
+            margin-bottom: 20px;
             overflow-x: auto;
-            padding-bottom: 12px; 
-            padding-top: 5px;
+            padding-bottom: 10px; 
         }}
         .cards-wrapper::-webkit-scrollbar {{ display: none; }}
         .cards-wrapper {{ -ms-overflow-style: none; scrollbar-width: none; }}
         
         .card-custom {{
             flex: 1;
-            min-width: 100px; /* Ajustado para caberem os 3 perfeitamente */
+            min-width: 95px;
             background-color: #ffffff;
-            border-radius: 20px;
-            padding: 20px 10px;
-            box-shadow: 0 6px 15px rgba(0,0,0,0.06);
+            border-radius: 16px;
+            padding: 15px 5px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.04);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            border: 1px solid #f1f3f5;
+            border: 1px solid #f8f9fa;
+            transition: transform 0.2s ease;
         }}
         
         @media (prefers-color-scheme: dark) {{
             .card-custom {{
-                background-color: #1e1e1e;
-                border: 1px solid #333;
-                box-shadow: 0 6px 15px rgba(255,255,255,0.03);
+                background-color: #1a1a1a;
+                border: 1px solid #2d2d2d;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             }}
         }}
 
-        .card-icon {{ font-size: 28px; margin-bottom: 8px; }}
+        .card-icon {{ font-size: 22px; margin-bottom: 4px; }}
         .card-title {{
-            font-size: 13px; color: #888; font-weight: 700;
+            font-size: 11px; color: #888; font-weight: 700;
             text-transform: uppercase; letter-spacing: 0.5px;
-            margin-bottom: 5px; text-align: center;
+            margin-bottom: 2px; text-align: center;
         }}
-        .card-value {{ font-size: 20px; font-weight: 800; text-align: center; }}
+        .card-value {{ font-size: 16px; font-weight: 800; text-align: center; }}
         
         .text-green {{ color: #20c997; }}
         .text-red {{ color: #ff6b6b; }}
@@ -136,50 +135,44 @@ if aba_selecionada == "Painel":
         
         st.divider()
 
-        # --- SEÇÃO DOS GRÁFICOS DE ROSCA ---
-        st.subheader("Análise Visual")
-        
-        # Cria duas colunas para os gráficos
+        # --- SEÇÃO DOS GRÁFICOS DE ROSCA (MENORES) ---
         col1, col2 = st.columns(2)
 
-        # GRÁFICO 1: Despesas por Categoria
         with col1:
-            st.markdown("**Despesas por Categoria**")
+            st.markdown("<p style='text-align: center; font-weight: 600; font-size: 13px; margin-bottom: -15px;'>Despesas</p>", unsafe_allow_html=True)
             df_despesas = df[df['Tipo'] == 'Despesa']
             if not df_despesas.empty and df_despesas['Valor'].sum() > 0:
-                fig1 = px.pie(df_despesas, values='Valor', names='Categoria', hole=0.5)
-                # Configurações para ficar bom no celular: sem legenda externa, texto dentro do gráfico
-                fig1.update_traces(textposition='inside', textinfo='percent+label')
-                fig1.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
+                fig1 = px.pie(df_despesas, values='Valor', names='Categoria', hole=0.65)
+                # Remove os nomes de fora e deixa apenas a percentagem limpa por dentro
+                fig1.update_traces(textposition='inside', textinfo='percent', hoverinfo='label+percent+value')
+                fig1.update_layout(
+                    showlegend=False, 
+                    margin=dict(t=20, b=0, l=0, r=0),
+                    height=220 # Gráfico bem menor e elegante
+                )
                 st.plotly_chart(fig1, use_container_width=True)
             else:
-                st.info("Sem saídas registradas.")
+                st.info("Sem saídas.")
 
-        # GRÁFICO 2: Renda vs Gastos
         with col2:
-            st.markdown("**Renda vs Gastos**")
+            st.markdown("<p style='text-align: center; font-weight: 600; font-size: 13px; margin-bottom: -15px;'>Renda vs Gastos</p>", unsafe_allow_html=True)
             if total_entradas > 0 or total_saidas > 0:
-                df_comparacao = pd.DataFrame({
-                    "Tipo": ["Entradas", "Saídas"],
-                    "Valor": [total_entradas, total_saidas]
-                })
-                # Filtra valores zero para o gráfico não ficar deformado
+                df_comparacao = pd.DataFrame({"Tipo": ["Entradas", "Saídas"], "Valor": [total_entradas, total_saidas]})
                 df_comparacao = df_comparacao[df_comparacao['Valor'] > 0]
                 
-                # Gráfico com cores fixas (Verde para Entradas, Vermelho para Saídas)
                 fig2 = px.pie(
-                    df_comparacao, 
-                    values='Valor', 
-                    names='Tipo', 
-                    hole=0.5,
-                    color='Tipo',
-                    color_discrete_map={"Entradas": "#20c997", "Saídas": "#ff6b6b"}
+                    df_comparacao, values='Valor', names='Tipo', hole=0.65,
+                    color='Tipo', color_discrete_map={"Entradas": "#20c997", "Saídas": "#ff6b6b"}
                 )
-                fig2.update_traces(textposition='inside', textinfo='percent+label')
-                fig2.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10))
+                fig2.update_traces(textposition='inside', textinfo='percent', hoverinfo='label+percent+value')
+                fig2.update_layout(
+                    showlegend=False, 
+                    margin=dict(t=20, b=0, l=0, r=0),
+                    height=220
+                )
                 st.plotly_chart(fig2, use_container_width=True)
             else:
-                st.info("Sem dados para comparar.")
+                st.info("Sem dados.")
 
 # --- ABA 2: LANÇAMENTOS ---
 elif aba_selecionada == "Lançamentos":
@@ -199,7 +192,7 @@ elif aba_selecionada == "Lançamentos":
                 if valor_entrada > 0:
                     nova_linha = pd.DataFrame({"Data": [data_entrada.strftime("%Y-%m-%d")], "Tipo": ["Receita"], "Categoria": [categoria_entrada], "Valor": [valor_entrada]})
                     st.session_state['dados'] = pd.concat([st.session_state['dados'], nova_linha], ignore_index=True)
-                    st.success(f"✅ Entrada de R$ {valor_entrada:.2f} salva com sucesso!")
+                    st.success(f"✅ Entrada salva!")
 
     with aba_saida:
         with st.form("form_saida"):
@@ -212,7 +205,7 @@ elif aba_selecionada == "Lançamentos":
                 if valor_saida > 0:
                     nova_linha = pd.DataFrame({"Data": [data_saida.strftime("%Y-%m-%d")], "Tipo": ["Despesa"], "Categoria": [categoria_saida], "Valor": [valor_saida]})
                     st.session_state['dados'] = pd.concat([st.session_state['dados'], nova_linha], ignore_index=True)
-                    st.success(f"✅ Saída de R$ {valor_saida:.2f} ({categoria_saida}) salva com sucesso!")
+                    st.success(f"✅ Saída salva!")
 
 # --- ABA 3: CONTROLES ---
 elif aba_selecionada == "Controles":
