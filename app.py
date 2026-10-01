@@ -1,13 +1,26 @@
 import streamlit as st
+from streamlit_option_menu import option_menu
 
 # Configuração da página para celular
-st.set_page_config(page_title="Controle Financeiro", layout="centered")
+st.set_page_config(page_title="Controle Financeiro", layout="centered", initial_sidebar_state="expanded")
 
-# --- BARRA LATERAL (MENU) ---
+# --- BARRA LATERAL (MENU BONITO) ---
 with st.sidebar:
-    st.title("Navegação")
-    # Cria os botões de navegação
-    aba_selecionada = st.radio("Ir para:", ["Painel", "Controle", "Lançamentos"])
+    st.write("") # Espaço em branco para dar um respiro no topo
+    
+    aba_selecionada = option_menu(
+        menu_title="Meu Financeiro",  # Título do menu
+        options=["Painel", "Controle", "Lançamentos"], # Os nomes dos seus botões
+        icons=["bar-chart-line-fill", "sliders", "plus-circle-fill"], # Ícones modernos para cada aba
+        menu_icon="wallet-fill", # Ícone que fica ao lado do Título
+        default_index=0, # Aba que abre por padrão (0 = Painel)
+        styles={
+            "container": {"padding": "5!important", "background-color": "transparent"},
+            "icon": {"color": "#555", "font-size": "20px"}, 
+            "nav-link": {"font-size": "16px", "text-align": "left", "margin":"5px", "--hover-color": "#f0f2f6"},
+            "nav-link-selected": {"background-color": "#28a745", "color": "white", "font-weight": "bold"},
+        }
+    )
 
 # --- ABA 1: PAINEL ---
 if aba_selecionada == "Painel":
