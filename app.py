@@ -293,12 +293,31 @@ elif aba_selecionada == "Lançamentos":
             csv = df_banco.to_csv(index=False).encode('utf-8')
             st.download_button(label="📥 Exportar (.CSV)", data=csv, file_name="financas_consolidadas.csv", mime="text/csv", use_container_width=True, type="primary")
         with col2:
-            # BOTÃO PARA LIMPAR OS DADOS DE TESTE
             if st.button("🗑️ Apagar Tudo", use_container_width=True):
                 df_vazio = pd.DataFrame(columns=["Data", "Tipo", "Categoria", "Detalhe", "Valor"])
                 salvar_dados(df_vazio)
                 st.success("✅ Base de dados limpa com sucesso!")
                 st.rerun()
+
+        st.divider()
+        st.subheader("Restaurar Base de Dados")
+        st.write("Faça o upload do ficheiro CSV que exportou anteriormente para restaurar os seus dados.")
+        arquivo_upload = st.file_uploader("Escolher ficheiro .CSV", type=["csv"])
+        
+        if arquivo_upload is not None:
+            if st.button("Restaurar Dados", use_container_width=True, type="primary"):
+                try:
+                    df_importado = pd.read_csv(arquivo_upload)
+                    colunas_padrao = ["Data", "Tipo", "Categoria", "Detalhe", "Valor"]
+                    for col in colunas_padrao:
+                        if col not in df_importado.columns:
+                            df_importado[col] = "" if col != "Valor" else 0.0
+                    df_importado = df_importado[colunas_padrao]
+                    salvar_dados(df_importado)
+                    st.success("✅ Base de dados restaurada com sucesso!")
+                    st.rerun()
+                except Exception as e:
+                    st.error("Erro ao ler o ficheiro. Verifique se é o CSV correto.")
 
 # --- ABA 3: CONTROLES DE CONTAS MENSAIS ---
 elif aba_selecionada == "Controles":
