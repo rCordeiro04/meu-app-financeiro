@@ -261,11 +261,10 @@ elif aba_selecionada == "Lançamentos":
 
 # --- ABA 3: CONTROLES DE CONTAS MENSAIS ---
 elif aba_selecionada == "Controles":
-    st.title("⚙️️ Controles de Contas")
+    st.title("⚙ Controles de Contas")
     st.write("Acompanhe as suas contas fixas mensais.")
     df_geral = carregar_dados()
 
-    # Variáveis de sessão para o Mês e Ano
     if 'mes_controle' not in st.session_state:
         st.session_state['mes_controle'] = date.today().strftime('%m')
     if 'ano_controle' not in st.session_state:
@@ -311,20 +310,19 @@ elif aba_selecionada == "Controles":
 
     contas_ativas_mes = []
     
-    # Identifica quais contas configuradas estão ativas no mês selecionado
     for _, row in df_setups.iterrows():
         setup_dt = pd.to_datetime(row['Data'])
         setup_mes_dt = pd.to_datetime(setup_dt.strftime('%m/%Y'), format='%m/%Y')
         
         diff_meses = (mes_selecionado_dt.year - setup_mes_dt.year) * 12 + (mes_selecionado_dt.month - setup_mes_dt.month)
         
-        if diff_meses >= 0: # A conta já começou
+        if diff_meses >= 0: 
             if row['Detalhe'] == 'Indefinido':
                 contas_ativas_mes.append(row)
             else:
                 try:
                     duracao = int(row['Detalhe'])
-                    if diff_meses < duracao: # Ainda está dentro da duração
+                    if diff_meses < duracao: 
                         contas_ativas_mes.append(row)
                 except:
                     pass
@@ -357,18 +355,25 @@ elif aba_selecionada == "Controles":
         st.info("Nenhuma conta registada como paga este mês.")
 
     # --- 2. CONTAS PENDENTES PARA PAGAR NESTE MÊS ---
-    contas_pendentes = [c for c in contas_ativas_mes if c['Categoria'] not in nomes_pagas]
+    # Para evitar erros de chaves duplicadas no Streamlit, garantimos nomes únicos na lista
+    contas_unicas = {}
+    for c in contas_ativas_mes:
+        if c['Categoria'] not in nomes_pagas and c['Categoria'] not in contas_unicas:
+            contas_unicas[c['Categoria']] = c
+
+    contas_pendentes = list(contas_unicas.values())
     
     st.subheader(f"⏳ Contas Pendentes")
     if contas_pendentes:
-        for p in contas_pendentes:
-            with st.form(f"pagar_{p['Categoria']}"):
+        for idx, p in enumerate(contas_pendentes):
+            # O f"pagar_{idx}_{p['Categoria']}" impede o erro DuplicateElementKey
+            with st.form(f"pagar_{idx}_{p['Categoria']}"):
                 colA, colB, colC = st.columns([2, 1, 1])
                 with colA:
                     st.markdown(f"<div style='margin-top: 5px; font-weight: bold;'>{p['Categoria']}</div>", unsafe_allow_html=True)
                     st.caption(f"Previsto: R$ {formatar_moeda(p['Valor'])}")
                 with colB:
-                    valor_pago = st.number_input("Valor Pago", value=float(p['Valor']), min_value=0.0, step=10.0, key=f"val_{p['Categoria']}")
+                    valor_pago = st.number_input("Valor Pago", value=float(p['Valor']), min_value=0.0, step=10.0, key=f"val_{idx}_{p['Categoria']}")
                 with colC:
                     if st.form_submit_button("Pagar", use_container_width=True):
                         nova_conta = pd.DataFrame({
@@ -390,8 +395,8 @@ elif aba_selecionada == "Controles":
     st.divider()
 
     # --- 3. CONFIGURAR NOVA CONTA FIXA ---
-    st.subheader("⚙️ Configurar Nova Conta Fixa")
-    st.write("Adicione despesas que se repetem (como renda, luz, prestações). O sistema lembrará de cobrá-las nos meses adequados.")
+    st.subheader("⚙ Configurar Nova Conta Fixa")
+    st.write("Adicione despesas que se repetem. O sistema lembrará de cobrá-las nos meses adequados.")
 
     with st.form("form_setup_conta"):
         nome_conta = st.text_input("Nome da Conta (ex: Internet, Mensalidade)")
