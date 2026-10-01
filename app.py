@@ -58,7 +58,7 @@ with st.sidebar:
         options=["Painel", "Lançamentos", "Controles"],
         icons=["pie-chart-fill", "plus-circle-fill", "ui-checks-grid"],
         menu_icon="wallet-fill",
-        default_index=1, 
+        default_index=2, 
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#6c757d", "font-size": "22px"}, 
@@ -325,41 +325,35 @@ elif aba_selecionada == "Controles":
     st.write("Gestão inteligente dos seus compromissos recorrentes.")
     df_geral = carregar_dados()
 
+    # Variáveis de sessão para o Mês e Ano
     if 'mes_controle' not in st.session_state:
         st.session_state['mes_controle'] = date.today().strftime('%m')
     if 'ano_controle' not in st.session_state:
         st.session_state['ano_controle'] = str(date.today().year)
 
-    # --- FILTRO DE ANO E MESES (ESTILO CHIP) ---
+    # --- FILTRO DE MÊS E ANO (CAIXAS DE SELEÇÃO) ---
+    meses_dict = {"01": "Janeiro", "02": "Fevereiro", "03": "Março", "04": "Abril", "05": "Maio", "06": "Junho", 
+                  "07": "Julho", "08": "Agosto", "09": "Setembro", "10": "Outubro", "11": "Novembro", "12": "Dezembro"}
+    nomes_meses = list(meses_dict.values())
+    mes_atual_nome = meses_dict[st.session_state['mes_controle']]
+
     ano_atual = date.today().year
     lista_anos = [str(a) for a in range(ano_atual - 2, ano_atual + 4)]
     
-    colA, colB = st.columns([1, 2])
-    with colA:
-        ano_selecionado = st.selectbox("Ano", lista_anos, index=lista_anos.index(st.session_state['ano_controle']), label_visibility="collapsed")
-        if ano_selecionado != st.session_state['ano_controle']:
-            st.session_state['ano_controle'] = ano_selecionado
-            st.rerun()
+    col1, col2 = st.columns(2)
+    with col1:
+        mes_selecionado = st.selectbox("📅 Selecione o Mês:", nomes_meses, index=nomes_meses.index(mes_atual_nome))
+    with col2:
+        ano_selecionado = st.selectbox("📅 Selecione o Ano:", lista_anos, index=lista_anos.index(st.session_state['ano_controle']))
 
-    meses_dict = {"Jan": "01", "Fev": "02", "Mar": "03", "Abr": "04", "Mai": "05", "Jun": "06", 
-                  "Jul": "07", "Ago": "08", "Set": "09", "Out": "10", "Nov": "11", "Dez": "12"}
-    mes_nomes = list(meses_dict.keys())
-    
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    
-    for row in range(3):
-        cols = st.columns(4)
-        for col_idx in range(4):
-            idx = row * 4 + col_idx
-            nome_mes = mes_nomes[idx]
-            num_mes = meses_dict[nome_mes]
-            
-            is_selected = (st.session_state['mes_controle'] == num_mes)
-            tipo_botao = "primary" if is_selected else "secondary"
-            
-            if cols[col_idx].button(nome_mes, key=f"btn_{num_mes}", use_container_width=True, type=tipo_botao):
-                st.session_state['mes_controle'] = num_mes
-                st.rerun()
+    # Recupera o número do mês com base no nome selecionado
+    mes_num_selecionado = [k for k, v in meses_dict.items() if v == mes_selecionado][0]
+
+    # Atualiza a sessão e recarrega a página se os filtros mudarem
+    if mes_num_selecionado != st.session_state['mes_controle'] or ano_selecionado != st.session_state['ano_controle']:
+        st.session_state['mes_controle'] = mes_num_selecionado
+        st.session_state['ano_controle'] = ano_selecionado
+        st.rerun()
 
     mes_input = f"{st.session_state['mes_controle']}/{st.session_state['ano_controle']}"
     mes_selecionado_dt = pd.to_datetime(mes_input, format='%m/%Y')
@@ -390,7 +384,7 @@ elif aba_selecionada == "Controles":
                     pass
 
     # --- CONTAS PAGAS (CARTÃO LUXO) ---
-    st.subheader(f"✅ Pagas em {mes_input}")
+    st.subheader(f"✅ Pagas em {mes_selecionado} de {st.session_state['ano_controle']}")
     if not df_pagas.empty:
         total_contas = df_pagas['Valor'].sum()
         
