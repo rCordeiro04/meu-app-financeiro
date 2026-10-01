@@ -3,17 +3,25 @@ import pandas as pd
 from streamlit_option_menu import option_menu
 from datetime import date
 import plotly.express as px
+import os
 
 # Configuração da página para celular
 st.set_page_config(page_title="Controle Financeiro", layout="centered", initial_sidebar_state="expanded")
 
-# --- FUNÇÃO AUXILIAR PARA FORMATAR MOEDA ---
+# --- SISTEMA DE ARMAZENAMENTO FÍSICO ---
+ARQUIVO_DADOS = "meu_banco_de_dados.csv"
+
+def carregar_dados():
+    if os.path.exists(ARQUIVO_DADOS):
+        return pd.read_csv(ARQUIVO_DADOS)
+    else:
+        return pd.DataFrame(columns=["Data", "Tipo", "Categoria", "Valor"])
+
+def salvar_dados(df):
+    df.to_csv(ARQUIVO_DADOS, index=False)
+
 def formatar_moeda(valor):
     return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-# --- INICIALIZAÇÃO DO BANCO DE DADOS ---
-if 'dados' not in st.session_state:
-    st.session_state['dados'] = pd.DataFrame(columns=["Data", "Tipo", "Categoria", "Valor"])
 
 # --- BARRA LATERAL (MENU BONITO E QUADRADO) ---
 with st.sidebar:
@@ -24,7 +32,7 @@ with st.sidebar:
         options=["Painel", "Lançamentos", "Controles", "Banco de Dados"],
         icons=["bar-chart-line-fill", "plus-circle-fill", "sliders", "database-fill"],
         menu_icon="wallet-fill",
-        default_index=0,
+        default_index=1, # Abre na aba de Lançamentos para você testar a gravação
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
@@ -43,17 +51,15 @@ with st.sidebar:
 if aba_selecionada == "Painel":
     st.title("📊 Painel")
     
-    df_completo = st.session_state['dados'].copy()
+    df_completo = carregar_dados()
     
     if df_completo.empty:
         st.info("Nenhum dado registrado ainda. Vá até 'Lançamentos' e faça o primeiro registro para ver os gráficos!")
     else:
-        # Prepara a base de dados temporal
         df_completo['Data'] = pd.to_datetime(df_completo['Data'])
-        df_completo = df_completo.sort_values('Data') # Ordena cronologicamente
+        df_completo = df_completo.sort_values('Data')
         df_completo['MesAno'] = df_completo['Data'].dt.strftime('%m/%Y')
         
-        # O filtro de mês atua apenas nas métricas pontuais e gráficos de rosca
         meses_disponiveis = ["Todos os Meses"] + sorted(list(df_completo['MesAno'].unique()), reverse=True)
         mes_selecionado = st.selectbox("📅 Filtrar Mês (Balões e Gráficos de Rosca)", meses_disponiveis)
         
@@ -75,7 +81,6 @@ if aba_selecionada == "Painel":
         }}
         .cards-wrapper::-webkit-scrollbar {{ display: none; }}
         .cards-wrapper {{ -ms-overflow-style: none; scrollbar-width: none; }}
-        
         .card-custom {{
             flex: 1; min-width: 95px; background-color: #ffffff; border-radius: 16px; padding: 15px 5px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.04); display: flex; flex-direction: column;
@@ -99,7 +104,6 @@ if aba_selecionada == "Painel":
         """
         st.markdown(html_cards, unsafe_allow_html=True)
 
-        # --- ESTILIZAÇÃO SOFISTICADA DOS GRÁFICOS (CARTÕES) ---
         st.markdown("""
         <style>
         [data-testid="stColumn"] {
@@ -107,14 +111,11 @@ if aba_selecionada == "Painel":
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); border: 1px solid #f0f2f6; margin-bottom: 15px;
         }
         @media (prefers-color-scheme: dark) {
-            [data-testid="stColumn"] {
-                background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-            }
+            [data-testid="stColumn"] { background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); }
         }
         </style>
         """, unsafe_allow_html=True)
         
-        # --- LINHA 1: GRÁFICOS DE ROSCA ---
         col1, col2 = st.columns(2)
 
         with col1:
@@ -142,12 +143,10 @@ if aba_selecionada == "Painel":
 
         st.markdown("<h3 style='font-size: 18px; margin-top: 20px; margin-bottom: 5px; color: #555;'>Evolução Histórica</h3>", unsafe_allow_html=True)
 
-        # --- LINHA 2: GRÁFICOS DE COLUNAS (TODOS OS MESES) ---
         col3, col4 = st.columns(2)
 
         with col3:
             st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Comparativo Anual</h4>", unsafe_allow_html=True)
-            # Agrupa os dados de todos os meses, ignorando o filtro lá de cima
             df_agrupado = df_completo.groupby(['MesAno', 'Tipo'], as_index=False)['Valor'].sum()
             df_agrupado['Tipo'] = df_agrupado['Tipo'].replace({'Receita': 'Entradas', 'Despesa': 'Saídas'})
             
@@ -164,14 +163,13 @@ if aba_selecionada == "Painel":
 
         with col4:
             st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Evolução do Guardado</h4>", unsafe_allow_html=True)
-            # Calcula o que foi guardado (Entradas - Saídas) de todos os meses
             df_pivot = df_completo.pivot_table(index='MesAno', columns='Tipo', values='Valor', aggfunc='sum', fill_value=0).reset_index()
             if 'Receita' not in df_pivot.columns: df_pivot['Receita'] = 0
             if 'Despesa' not in df_pivot.columns: df_pivot['Despesa'] = 0
             df_pivot['Guardado'] = df_pivot['Receita'] - df_pivot['Despesa']
             
             fig4 = px.bar(df_pivot, x='MesAno', y='Guardado')
-            fig4.update_traces(marker_color='#b197fc') # Roxo sofisticado
+            fig4.update_traces(marker_color='#b197fc')
             fig4.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                 margin=dict(t=10, b=10, l=0, r=0), height=240,
@@ -197,9 +195,11 @@ elif aba_selecionada == "Lançamentos":
             
             if st.form_submit_button("Salvar Entrada", use_container_width=True):
                 if valor_entrada > 0:
+                    df = carregar_dados()
                     nova_linha = pd.DataFrame({"Data": [data_entrada.strftime("%Y-%m-%d")], "Tipo": ["Receita"], "Categoria": [categoria_entrada], "Valor": [valor_entrada]})
-                    st.session_state['dados'] = pd.concat([st.session_state['dados'], nova_linha], ignore_index=True)
-                    st.success(f"✅ Entrada salva!")
+                    df = pd.concat([df, nova_linha], ignore_index=True)
+                    salvar_dados(df)
+                    st.success(f"✅ Entrada salva fisicamente!")
 
     with aba_saida:
         with st.form("form_saida"):
@@ -210,9 +210,11 @@ elif aba_selecionada == "Lançamentos":
             
             if st.form_submit_button("Salvar Saída", use_container_width=True):
                 if valor_saida > 0:
+                    df = carregar_dados()
                     nova_linha = pd.DataFrame({"Data": [data_saida.strftime("%Y-%m-%d")], "Tipo": ["Despesa"], "Categoria": [categoria_saida], "Valor": [valor_saida]})
-                    st.session_state['dados'] = pd.concat([st.session_state['dados'], nova_linha], ignore_index=True)
-                    st.success(f"✅ Saída salva!")
+                    df = pd.concat([df, nova_linha], ignore_index=True)
+                    salvar_dados(df)
+                    st.success(f"✅ Saída salva fisicamente!")
 
 # --- ABA 3: CONTROLES ---
 elif aba_selecionada == "Controles":
@@ -222,14 +224,17 @@ elif aba_selecionada == "Controles":
 # --- ABA 4: BANCO DE DADOS ---
 elif aba_selecionada == "Banco de Dados":
     st.title("🗄️ Banco de Dados")
-    if not st.session_state['dados'].empty:
-        st.dataframe(st.session_state['dados'], use_container_width=True, hide_index=True)
+    
+    df = carregar_dados()
+    
+    if not df.empty:
+        st.dataframe(df, use_container_width=True, hide_index=True)
     else:
         st.info("Nenhum dado registrado ainda.")
 
     st.divider()
     st.subheader("📤 Exportar")
-    csv = st.session_state['dados'].to_csv(index=False).encode('utf-8')
+    csv = df.to_csv(index=False).encode('utf-8')
     st.download_button(label="📥 Baixar Planilha CSV", data=csv, file_name="meu_controle_financeiro.csv", mime="text/csv", use_container_width=True)
 
     st.divider()
@@ -238,6 +243,6 @@ elif aba_selecionada == "Banco de Dados":
     if arquivo_upload is not None:
         df_importado = pd.read_csv(arquivo_upload)
         if st.button("Substituir dados atuais", use_container_width=True):
-            st.session_state['dados'] = df_importado
-            st.success("Dados importados!")
+            salvar_dados(df_importado)
+            st.success("Dados importados e salvos com sucesso!")
             st.rerun()
