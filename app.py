@@ -23,19 +23,7 @@ def salvar_dados(df):
     df.to_csv(ARQUIVO_DADOS, index=False)
 
 def carregar_controles():
-    if os.path.exists(ARQUIVO_CONTROLES):
-        with open(ARQUIVO_CONTROLES, 'r', encoding='utf-8') as f:
-            dados = json.load(f)
-            if "contas_pagas" not in dados: dados["contas_pagas"] = {}
-            if "investimentos" not in dados: 
-                # Estrutura aprimorada: nome -> {atual, meta, prazo}
-                dados["investimentos"] = {
-                    "Reserva de Emergência": {"atual": 0.0, "meta": 10000.0, "prazo": "12 meses"},
-                    "CDB / Tesouro": {"atual": 0.0, "meta": 5000.0, "prazo": "6 meses"},
-                    "Ações / FIIs": {"atual": 0.0, "meta": 20000.0, "prazo": "Longo Prazo"}
-                }
-            return dados
-    return {
+    padrao = {
         "contas_pagas": {},
         "investimentos": {
             "Reserva de Emergência": {"atual": 0.0, "meta": 10000.0, "prazo": "12 meses"},
@@ -43,6 +31,30 @@ def carregar_controles():
             "Ações / FIIs": {"atual": 0.0, "meta": 20000.0, "prazo": "Longo Prazo"}
         }
     }
+    if os.path.exists(ARQUIVO_CONTROLES):
+        try:
+            with open(ARQUIVO_CONTROLES, 'r', encoding='utf-8') as f:
+                dados = json.load(f)
+                if "contas_pagas" not in dados: dados["contas_pagas"] = {}
+                if "investimentos" not in dados: 
+                    dados["investimentos"] = padrao["investimentos"]
+                else:
+                    # Converte se houver formato antigo em formato numérico simples
+                    inv_corrigido = {}
+                    for k, v in dados["investimentos"].items():
+                        if isinstance(v, (int, float)):
+                            inv_corrigido[k] = {"atual": float(v), "meta": 10000.0, "prazo": "Não definido"}
+                        elif isinstance(v, dict):
+                            inv_corrigido[k] = {
+                                "atual": float(v.get("atual", 0.0)),
+                                "meta": float(v.get("meta", 1000.0)),
+                                "prazo": str(v.get("prazo", "Não definido"))
+                            }
+                    dados["investimentos"] = inv_corrigido
+                return dados
+        except Exception:
+            return padrao
+    return padrao
 
 def salvar_controles(dados):
     with open(ARQUIVO_CONTROLES, 'w', encoding='utf-8') as f:
@@ -294,7 +306,6 @@ elif aba_selecionada == "Controles":
                 meta = inv_info.get("meta", 1.0)
                 prazo = inv_info.get("prazo", "Sem prazo")
                 
-                # Evita divisão por zero
                 progresso = min(atual / meta, 1.0) if meta > 0 else 0.0
                 
                 with st.container():
@@ -302,7 +313,6 @@ elif aba_selecionada == "Controles":
                     st.progress(progresso, text=f"Guardado: R$ {formatar_moeda(atual)} / Meta: R$ {formatar_moeda(meta)} ({int(progresso * 100)}%)")
                 st.divider()
 
-        # --- CRIAR NOVO INVESTIMENTO (COM NOME, META E PRAZO) ---
         st.subheader("Criar Novo Objetivo de Investimento")
         with st.form("form_novo_investimento"):
             nome_novo = st.text_input("Nome do Investimento/Meta (ex: Comprar Carro)")
@@ -322,7 +332,6 @@ elif aba_selecionada == "Controles":
                 else:
                     st.error("Insira um nome válido que ainda não exista.")
 
-        # --- ATUALIZAR VALOR GUARDADO COM O TEMPO ---
         st.subheader("Atualizar Valor Guardado")
         if investimentos_dict:
             with st.form("form_atualiza_progresso"):
