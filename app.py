@@ -6,8 +6,8 @@ import plotly.express as px
 import os
 import json
 
-# Configuração da página para celular
-st.set_page_config(page_title="Controle Financeiro", layout="centered", initial_sidebar_state="expanded")
+# Configuração da página para telemóvel
+st.set_page_config(page_title="Controlo Financeiro", layout="centered", initial_sidebar_state="expanded")
 
 # --- SISTEMAS DE ARMAZENAMENTO FÍSICO ---
 ARQUIVO_DADOS = "meu_banco_de_dados.csv"
@@ -25,11 +25,7 @@ def salvar_dados(df):
 def carregar_controles():
     padrao = {
         "contas_pagas": {},
-        "investimentos": {
-            "Reserva de Emergência": {"atual": 0.0, "meta": 10000.0, "prazo": "12 meses"},
-            "CDB / Tesouro": {"atual": 0.0, "meta": 5000.0, "prazo": "6 meses"},
-            "Ações / FIIs": {"atual": 0.0, "meta": 20000.0, "prazo": "Longo Prazo"}
-        }
+        "investimentos": {} # Começa totalmente vazio, apenas com o que o utilizador inserir
     }
     if os.path.exists(ARQUIVO_CONTROLES):
         try:
@@ -37,13 +33,13 @@ def carregar_controles():
                 dados = json.load(f)
                 if "contas_pagas" not in dados: dados["contas_pagas"] = {}
                 if "investimentos" not in dados: 
-                    dados["investimentos"] = padrao["investimentos"]
+                    dados["investimentos"] = {}
                 else:
-                    # Converte se houver formato antigo em formato numérico simples
+                    # Converte dados antigos se necessário
                     inv_corrigido = {}
                     for k, v in dados["investimentos"].items():
                         if isinstance(v, (int, float)):
-                            inv_corrigido[k] = {"atual": float(v), "meta": 10000.0, "prazo": "Não definido"}
+                            inv_corrigido[k] = {"atual": float(v), "meta": 1000.0, "prazo": "Não definido"}
                         elif isinstance(v, dict):
                             inv_corrigido[k] = {
                                 "atual": float(v.get("atual", 0.0)),
@@ -68,7 +64,7 @@ with st.sidebar:
     st.write("") 
     
     aba_selecionada = option_menu(
-        menu_title="Meu Financeiro",
+        menu_title="O Meu Financeiro",
         options=["Painel", "Lançamentos", "Controles"],
         icons=["bar-chart-line-fill", "plus-circle-fill", "sliders"],
         menu_icon="wallet-fill",
@@ -87,7 +83,7 @@ if aba_selecionada == "Painel":
     df_completo = carregar_dados()
     
     if df_completo.empty:
-        st.info("Nenhum dado registrado ainda. Vá até 'Lançamentos' e faça o primeiro registro para ver os gráficos!")
+        st.info("Nenhum dado registado ainda. Vá até 'Lançamentos' e faça o primeiro registo para ver os gráficos!")
     else:
         df_completo['Data'] = pd.to_datetime(df_completo['Data'])
         df_completo = df_completo.sort_values('Data')
@@ -187,9 +183,9 @@ if aba_selecionada == "Painel":
 # --- ABA 2: LANÇAMENTOS ---
 elif aba_selecionada == "Lançamentos":
     st.title("➕ Lançamentos")
-    st.write("Registre e consulte suas movimentações financeiras.")
+    st.write("Registe e consulte as suas movimentações financeiras.")
 
-    aba_entrada, aba_saida, aba_banco = st.tabs(["Entradas 📈", "Saídas 📉", "Banco de Dados 🗄️"])
+    aba_entrada, aba_saida, aba_banco = st.tabs(["Entradas 📈", "Saídas 📉", "Base de Dados 🗄️"])
 
     with aba_entrada:
         with st.form("form_entrada"):
@@ -204,7 +200,7 @@ elif aba_selecionada == "Lançamentos":
                     nova_linha = pd.DataFrame({"Data": [data_entrada.strftime("%Y-%m-%d")], "Tipo": ["Receita"], "Categoria": [categoria_entrada], "Valor": [valor_entrada]})
                     df = pd.concat([df, nova_linha], ignore_index=True)
                     salvar_dados(df)
-                    st.success(f"✅ Entrada salva fisicamente!")
+                    st.success(f"✅ Entrada salva com sucesso!")
 
     with aba_saida:
         with st.form("form_saida"):
@@ -219,7 +215,7 @@ elif aba_selecionada == "Lançamentos":
                     nova_linha = pd.DataFrame({"Data": [data_saida.strftime("%Y-%m-%d")], "Tipo": ["Despesa"], "Categoria": [categoria_saida], "Valor": [valor_saida]})
                     df = pd.concat([df, nova_linha], ignore_index=True)
                     salvar_dados(df)
-                    st.success(f"✅ Saída salva fisicamente!")
+                    st.success(f"✅ Saída salva com sucesso!")
 
     with aba_banco:
         st.subheader("Consultar Registos")
@@ -227,7 +223,7 @@ elif aba_selecionada == "Lançamentos":
         if not df_banco.empty:
             st.dataframe(df_banco, use_container_width=True, hide_index=True)
         else:
-            st.info("Nenhum dado registrado ainda.")
+            st.info("Nenhum dado registado ainda.")
 
         st.divider()
         st.subheader("📤 Exportar Dados")
@@ -236,7 +232,7 @@ elif aba_selecionada == "Lançamentos":
 
         st.divider()
         st.subheader("📥 Importar Dados")
-        arquivo_upload = st.file_uploader("Escolha um arquivo .CSV", type=["csv"])
+        arquivo_upload = st.file_uploader("Escolha um ficheiro .CSV", type=["csv"])
         if arquivo_upload is not None:
             df_importado = pd.read_csv(arquivo_upload)
             if st.button("Substituir dados atuais pela planilha", use_container_width=True):
@@ -296,11 +292,11 @@ elif aba_selecionada == "Controles":
 
     with aba_invest:
         st.subheader("Planeamento de Investimentos e Metas")
-        st.write("Consulte os seus objetivos, prazos e valores acumulados.")
-
+        
         investimentos_dict = controles.get("investimentos", {})
         
         if investimentos_dict:
+            st.write("Consulte os seus objetivos, prazos e valores acumulados.")
             for inv_nome, inv_info in investimentos_dict.items():
                 atual = inv_info.get("atual", 0.0)
                 meta = inv_info.get("meta", 1.0)
@@ -312,6 +308,8 @@ elif aba_selecionada == "Controles":
                     st.markdown(f"**{inv_nome}** (Prazo: *{prazo}*)")
                     st.progress(progresso, text=f"Guardado: R$ {formatar_moeda(atual)} / Meta: R$ {formatar_moeda(meta)} ({int(progresso * 100)}%)")
                 st.divider()
+        else:
+            st.info("Ainda não existem investimentos criados. Utilize o formulário abaixo para registar a sua primeira meta.")
 
         st.subheader("Criar Novo Objetivo de Investimento")
         with st.form("form_novo_investimento"):
@@ -332,8 +330,8 @@ elif aba_selecionada == "Controles":
                 else:
                     st.error("Insira um nome válido que ainda não exista.")
 
-        st.subheader("Atualizar Valor Guardado")
         if investimentos_dict:
+            st.subheader("Atualizar Valor Guardado")
             with st.form("form_atualiza_progresso"):
                 inv_escolhido = st.selectbox("Selecionar Meta", list(investimentos_dict.keys()))
                 tipo_op = st.radio("Operação", ["Adicionar (Depositar)", "Definir Valor Exato"], horizontal=True)
