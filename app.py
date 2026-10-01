@@ -2,12 +2,12 @@ import streamlit as st
 import pandas as pd
 from streamlit_option_menu import option_menu
 from datetime import date
+import plotly.express as px
 
 # Configuração da página para celular
 st.set_page_config(page_title="Controle Financeiro", layout="centered", initial_sidebar_state="expanded")
 
 # --- INICIALIZAÇÃO DO BANCO DE DADOS ---
-# Cria a tabela de memória do aplicativo caso ela não exista
 if 'dados' not in st.session_state:
     st.session_state['dados'] = pd.DataFrame(columns=["Data", "Tipo", "Categoria", "Valor"])
 
@@ -17,10 +17,10 @@ with st.sidebar:
     
     aba_selecionada = option_menu(
         menu_title="Meu Financeiro",
-        options=["Painel", "Lançamentos", "Controles", "Banco de Dados"], # Adicionado 'Controles'
-        icons=["bar-chart-line-fill", "plus-circle-fill", "sliders", "database-fill"], # Ícone de sliders para controles
+        options=["Painel", "Lançamentos", "Controles", "Banco de Dados"],
+        icons=["bar-chart-line-fill", "plus-circle-fill", "sliders", "database-fill"],
         menu_icon="wallet-fill",
-        default_index=2, # Abre direto na aba Controles para você ver
+        default_index=0, # Alterado para abrir direto no Painel
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
@@ -44,7 +44,50 @@ with st.sidebar:
 # --- ABA 1: PAINEL ---
 if aba_selecionada == "Painel":
     st.title("📊 Painel")
-    st.info("🚧 Tela em desenvolvimento. Aqui ficarão os gráficos de resumo e os alertas de gastos.")
+    
+    df = st.session_state['dados'].copy()
+    
+    if df.empty:
+        st.info("Nenhum dado registrado ainda. Vá até 'Lançamentos' e faça o primeiro registro para ver os gráficos!")
+    else:
+        # Prepara as datas para o filtro
+        df['Data'] = pd.to_datetime(df['Data'])
+        df['MesAno'] = df['Data'].dt.strftime('%m/%Y')
+        
+        # Cria as opções do filtro (Todos + os meses que existem no banco)
+        meses_disponiveis = ["Todos os Meses"] + sorted(list(df['MesAno'].unique()), reverse=True)
+        mes_selecionado = st.selectbox("📅 Filtrar por Mês/Ano", meses_disponiveis)
+        
+        st.divider()
+        
+        # Aplica o filtro se não for "Todos"
+        if mes_selecionado != "Todos os Meses":
+            df = df[df['MesAno'] == mes_selecionado]
+            
+        # Cálculos das métricas
+        total_entradas = df[df['Tipo'] == 'Receita']['Valor'].sum()
+        total_saidas = df[df['Tipo'] == 'Despesa']['Valor'].sum()
+        liquido = total_entradas - total_saidas
+        
+        # Cálculo provisório do valor guardado (usando o que sobrou no mês)
+        guardado = liquido if liquido > 0 else 0.0
+
+        # Balões de métricas (Cards)
+        col1, col2 = st.columns(2)
+        col3, col4 = st.columns(2)
+        
+        col1.metric("Entradas 📈", f"R$ {total_entradas:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col2.metric("Saídas 📉", f"R$ {total_saidas:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col3.metric("Líquido ⚖️", f"R$ {liquido:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col4.metric("Guardado 💰", f"R$ {guardado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        
+        st.divider()
+
+        # Gráfico de despesas do período
+        if total_saidas > 0:
+            st.subheader("Distribuição de Despesas")
+            fig = px.pie(df[df['Tipo'] == 'Despesa'], values='Valor', names='Categoria', hole=0.5)
+            st.plotly_chart(fig, use_container_width=True)
 
 # --- ABA 2: LANÇAMENTOS ---
 elif aba_selecionada == "Lançamentos":
@@ -53,7 +96,6 @@ elif aba_selecionada == "Lançamentos":
 
     aba_entrada, aba_saida = st.tabs(["Entradas 📈", "Saídas 📉"])
 
-    # -- FORMULÁRIO DE ENTRADAS --
     with aba_entrada:
         with st.form("form_entrada"):
             st.subheader("Nova Receita")
@@ -74,7 +116,6 @@ elif aba_selecionada == "Lançamentos":
                 else:
                     st.error("O valor precisa ser maior que zero.")
 
-    # -- FORMULÁRIO DE SAÍDAS --
     with aba_saida:
         with st.form("form_saida"):
             st.subheader("Nova Despesa")
@@ -98,7 +139,7 @@ elif aba_selecionada == "Lançamentos":
 # --- ABA 3: CONTROLES ---
 elif aba_selecionada == "Controles":
     st.title("⚙️ Controles")
-    st.info("🚧 Tela em desenvolvimento. O que você quer colocar aqui? (Ex: Definir limites de gastos, deletar itens errados, gerenciar categorias...)")
+    st.info("🚧 Tela em desenvolvimento. O que você quer colocar aqui?")
 
 # --- ABA 4: BANCO DE DADOS ---
 elif aba_selecionada == "Banco de Dados":
@@ -111,28 +152,16 @@ elif aba_selecionada == "Banco de Dados":
         st.info("Nenhum dado registrado ainda. Vá até 'Lançamentos' e faça o primeiro registro!")
 
     st.divider()
-
     st.subheader("📤 Exportar Dados")
-    st.write("Baixe tudo o que você cadastrou para uma planilha de Excel/CSV.")
     csv = st.session_state['dados'].to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Baixar Planilha CSV",
-        data=csv,
-        file_name="meu_controle_financeiro.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
+    st.download_button(label="📥 Baixar Planilha CSV", data=csv, file_name="meu_controle_financeiro.csv", mime="text/csv", use_container_width=True)
 
     st.divider()
-
     st.subheader("📥 Importar Dados")
-    st.write("Envie uma planilha CSV antiga para dentro do aplicativo.")
     arquivo_upload = st.file_uploader("Escolha um arquivo .CSV", type=["csv"])
-    
     if arquivo_upload is not None:
         try:
             df_importado = pd.read_csv(arquivo_upload)
-            
             if st.button("Substituir dados atuais pela planilha", use_container_width=True):
                 st.session_state['dados'] = df_importado
                 st.success("Dados importados com sucesso!")
