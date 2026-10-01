@@ -61,101 +61,83 @@ if aba_selecionada == "Painel":
         total_saidas = df[df['Tipo'] == 'Despesa']['Valor'].sum()
         liquido = total_entradas - total_saidas
 
-        # --- DESIGN DOS 3 BALÕES (MAIS COMPACTOS E ELEGANTES) ---
+        # --- DESIGN DOS BALÕES ---
         html_cards = f"""
         <style>
         .cards-wrapper {{
-            display: flex;
-            flex-direction: row;
-            justify-content: space-between;
-            gap: 10px;
-            margin-top: 10px;
-            margin-bottom: 20px;
-            overflow-x: auto;
-            padding-bottom: 10px; 
+            display: flex; flex-direction: row; justify-content: space-between; gap: 10px;
+            margin-top: 10px; margin-bottom: 25px; overflow-x: auto; padding-bottom: 10px; 
         }}
         .cards-wrapper::-webkit-scrollbar {{ display: none; }}
         .cards-wrapper {{ -ms-overflow-style: none; scrollbar-width: none; }}
         
         .card-custom {{
-            flex: 1;
-            min-width: 95px;
-            background-color: #ffffff;
-            border-radius: 16px;
-            padding: 15px 5px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.04);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid #f8f9fa;
-            transition: transform 0.2s ease;
+            flex: 1; min-width: 95px; background-color: #ffffff; border-radius: 16px; padding: 15px 5px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.04); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; border: 1px solid #f8f9fa; transition: transform 0.2s ease;
         }}
-        
         @media (prefers-color-scheme: dark) {{
-            .card-custom {{
-                background-color: #1a1a1a;
-                border: 1px solid #2d2d2d;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            }}
+            .card-custom {{ background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }}
         }}
-
         .card-icon {{ font-size: 22px; margin-bottom: 4px; }}
-        .card-title {{
-            font-size: 11px; color: #888; font-weight: 700;
-            text-transform: uppercase; letter-spacing: 0.5px;
-            margin-bottom: 2px; text-align: center;
-        }}
+        .card-title {{ font-size: 11px; color: #888; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; text-align: center; }}
         .card-value {{ font-size: 16px; font-weight: 800; text-align: center; }}
-        
         .text-green {{ color: #20c997; }}
         .text-red {{ color: #ff6b6b; }}
         .text-blue {{ color: #339af0; }}
         </style>
-
         <div class="cards-wrapper">
-            <div class="card-custom">
-                <div class="card-icon">📈</div>
-                <div class="card-title">Entradas</div>
-                <div class="card-value text-green">R$ {formatar_moeda(total_entradas)}</div>
-            </div>
-            <div class="card-custom">
-                <div class="card-icon">📉</div>
-                <div class="card-title">Saídas</div>
-                <div class="card-value text-red">R$ {formatar_moeda(total_saidas)}</div>
-            </div>
-            <div class="card-custom">
-                <div class="card-icon">⚖️</div>
-                <div class="card-title">Líquido</div>
-                <div class="card-value text-blue">R$ {formatar_moeda(liquido)}</div>
-            </div>
+            <div class="card-custom"><div class="card-icon">📈</div><div class="card-title">Entradas</div><div class="card-value text-green">R$ {formatar_moeda(total_entradas)}</div></div>
+            <div class="card-custom"><div class="card-icon">📉</div><div class="card-title">Saídas</div><div class="card-value text-red">R$ {formatar_moeda(total_saidas)}</div></div>
+            <div class="card-custom"><div class="card-icon">⚖️</div><div class="card-title">Líquido</div><div class="card-value text-blue">R$ {formatar_moeda(liquido)}</div></div>
         </div>
         """
         st.markdown(html_cards, unsafe_allow_html=True)
-        
-        st.divider()
 
-        # --- SEÇÃO DOS GRÁFICOS DE ROSCA (MENORES) ---
+        # --- ESTILIZAÇÃO SOFISTICADA PARA OS GRÁFICOS ---
+        st.markdown("""
+        <style>
+        /* Transforma as colunas dos gráficos em cartões elegantes com sombra */
+        [data-testid="stColumn"] {
+            background-color: #ffffff;
+            border-radius: 20px;
+            padding: 20px 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid #f0f2f6;
+            margin-bottom: 15px;
+        }
+        @media (prefers-color-scheme: dark) {
+            [data-testid="stColumn"] {
+                background-color: #1a1a1a;
+                border: 1px solid #2d2d2d;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown("<p style='text-align: center; font-weight: 600; font-size: 13px; margin-bottom: -15px;'>Despesas</p>", unsafe_allow_html=True)
+            # Título corrigido com espaçamento adequado
+            st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Despesas</h4>", unsafe_allow_html=True)
             df_despesas = df[df['Tipo'] == 'Despesa']
             if not df_despesas.empty and df_despesas['Valor'].sum() > 0:
                 fig1 = px.pie(df_despesas, values='Valor', names='Categoria', hole=0.65)
-                # Remove os nomes de fora e deixa apenas a percentagem limpa por dentro
                 fig1.update_traces(textposition='inside', textinfo='percent', hoverinfo='label+percent+value')
                 fig1.update_layout(
                     showlegend=False, 
-                    margin=dict(t=20, b=0, l=0, r=0),
-                    height=220 # Gráfico bem menor e elegante
+                    margin=dict(t=10, b=10, l=10, r=10),
+                    height=220,
+                    paper_bgcolor='rgba(0,0,0,0)', # Fundo transparente para herdar a cor do cartão
+                    plot_bgcolor='rgba(0,0,0,0)'
                 )
                 st.plotly_chart(fig1, use_container_width=True)
             else:
                 st.info("Sem saídas.")
 
         with col2:
-            st.markdown("<p style='text-align: center; font-weight: 600; font-size: 13px; margin-bottom: -15px;'>Renda vs Gastos</p>", unsafe_allow_html=True)
+            st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Renda vs Gastos</h4>", unsafe_allow_html=True)
             if total_entradas > 0 or total_saidas > 0:
                 df_comparacao = pd.DataFrame({"Tipo": ["Entradas", "Saídas"], "Valor": [total_entradas, total_saidas]})
                 df_comparacao = df_comparacao[df_comparacao['Valor'] > 0]
@@ -167,8 +149,10 @@ if aba_selecionada == "Painel":
                 fig2.update_traces(textposition='inside', textinfo='percent', hoverinfo='label+percent+value')
                 fig2.update_layout(
                     showlegend=False, 
-                    margin=dict(t=20, b=0, l=0, r=0),
-                    height=220
+                    margin=dict(t=10, b=10, l=10, r=10),
+                    height=220,
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)'
                 )
                 st.plotly_chart(fig2, use_container_width=True)
             else:
