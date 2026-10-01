@@ -38,7 +38,7 @@ with st.sidebar:
         options=["Painel", "Lançamentos", "Controles"],
         icons=["bar-chart-line-fill", "plus-circle-fill", "sliders"],
         menu_icon="wallet-fill",
-        default_index=1, 
+        default_index=2, 
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
@@ -265,8 +265,47 @@ elif aba_selecionada == "Controles":
     st.write("Acompanhe e registe o pagamento das suas contas fixas mensais.")
     df_geral = carregar_dados()
 
-    mes_atual_str = date.today().strftime('%m/%Y')
-    mes_input = st.text_input("Mês de Referência (MM/AAAA)", value=mes_atual_str)
+    # Variáveis de sessão para o Mês e Ano
+    if 'mes_controle' not in st.session_state:
+        st.session_state['mes_controle'] = date.today().strftime('%m')
+    if 'ano_controle' not in st.session_state:
+        st.session_state['ano_controle'] = str(date.today().year)
+
+    # --- FILTRO DE ANO ---
+    ano_atual = date.today().year
+    lista_anos = [str(a) for a in range(ano_atual - 2, ano_atual + 4)]
+    
+    ano_selecionado = st.selectbox("📅 Selecione o Ano:", lista_anos, index=lista_anos.index(st.session_state['ano_controle']))
+    if ano_selecionado != st.session_state['ano_controle']:
+        st.session_state['ano_controle'] = ano_selecionado
+        st.rerun()
+
+    # --- BOTÕES DE MESES ---
+    st.markdown("**Selecione o Mês:**")
+    meses_dict = {"Jan": "01", "Fev": "02", "Mar": "03", "Abr": "04", "Mai": "05", "Jun": "06", 
+                  "Jul": "07", "Ago": "08", "Set": "09", "Out": "10", "Nov": "11", "Dez": "12"}
+    mes_nomes = list(meses_dict.keys())
+    
+    # Grelha de botões 3x4 (excelente para telemóveis)
+    for row in range(3):
+        cols = st.columns(4)
+        for col_idx in range(4):
+            idx = row * 4 + col_idx
+            nome_mes = mes_nomes[idx]
+            num_mes = meses_dict[nome_mes]
+            
+            # Destaca o botão selecionado usando type="primary"
+            is_selected = (st.session_state['mes_controle'] == num_mes)
+            tipo_botao = "primary" if is_selected else "secondary"
+            
+            if cols[col_idx].button(nome_mes, key=f"btn_{num_mes}", use_container_width=True, type=tipo_botao):
+                st.session_state['mes_controle'] = num_mes
+                st.rerun()
+
+    # Constroi a string final usada para pesquisa no banco de dados (ex: "10/2026")
+    mes_input = f"{st.session_state['mes_controle']}/{st.session_state['ano_controle']}"
+
+    st.divider()
     st.subheader(f"Contas Pagas em {mes_input}")
     
     df_contas_mes = df_geral[(df_geral['Tipo'] == 'Despesa Fixa') & (df_geral['Detalhe'] == mes_input)]
@@ -319,7 +358,7 @@ elif aba_selecionada == "Controles":
         st.info("Nenhuma conta registada para este mês.")
 
     st.divider()
-    st.subheader("Registar Nova Conta do Mês")
+    st.subheader(f"Registar Nova Conta para {mes_input}")
     with st.form("form_nova_conta"):
         col1, col2 = st.columns(2)
         with col1:
@@ -341,7 +380,7 @@ elif aba_selecionada == "Controles":
                 })
                 df_geral = pd.concat([df_geral, nova_conta], ignore_index=True)
                 salvar_dados(df_geral)
-                st.success(f"✅ Conta '{nome_final}' de R$ {formatar_moeda(valor_conta)} registada com sucesso!")
+                st.success(f"✅ Conta '{nome_final}' de R$ {formatar_moeda(valor_conta)} registada para {mes_input}!")
                 st.rerun()
             else:
                 st.error("Por favor, informe o nome da conta e um valor maior que zero.")
