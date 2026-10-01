@@ -25,28 +25,26 @@ def salvar_dados(df):
 def carregar_controles():
     padrao = {
         "contas_pagas": {},
-        "investimentos": {} # Começa totalmente vazio, apenas com o que o utilizador inserir
+        "investimentos": {} 
     }
     if os.path.exists(ARQUIVO_CONTROLES):
         try:
             with open(ARQUIVO_CONTROLES, 'r', encoding='utf-8') as f:
                 dados = json.load(f)
                 if "contas_pagas" not in dados: dados["contas_pagas"] = {}
-                if "investimentos" not in dados: 
-                    dados["investimentos"] = {}
-                else:
-                    # Converte dados antigos se necessário
-                    inv_corrigido = {}
-                    for k, v in dados["investimentos"].items():
-                        if isinstance(v, (int, float)):
-                            inv_corrigido[k] = {"atual": float(v), "meta": 1000.0, "prazo": "Não definido"}
-                        elif isinstance(v, dict):
-                            inv_corrigido[k] = {
-                                "atual": float(v.get("atual", 0.0)),
-                                "meta": float(v.get("meta", 1000.0)),
-                                "prazo": str(v.get("prazo", "Não definido"))
-                            }
-                    dados["investimentos"] = inv_corrigido
+                
+                # Limpa automaticamente itens antigos padrão se estiverem zerados ou presentes
+                invs = dados.get("investimentos", {})
+                itens_padrao_antigos = ["Reserva de Emergência", "CDB / Tesouro", "Ações / FIIs"]
+                
+                # Se contiver apenas os itens antigos zerados, limpa-os para começar do zero
+                if all(k in itens_padrao_antigos for k in invs.keys()) or not invs:
+                    # Verifica se estão todos a 0 para limpar sem perder dinheiro real do utilizador
+                    tem_valor = any(v.get("atual", 0) > 0 for v in invs.values() if isinstance(v, dict))
+                    if not tem_valor:
+                        invs = {}
+
+                dados["investimentos"] = invs
                 return dados
         except Exception:
             return padrao
