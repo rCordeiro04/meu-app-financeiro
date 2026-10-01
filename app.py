@@ -1,9 +1,15 @@
 import streamlit as st
+import pandas as pd
 from streamlit_option_menu import option_menu
 from datetime import date
 
 # Configuração da página para celular
 st.set_page_config(page_title="Controle Financeiro", layout="centered", initial_sidebar_state="expanded")
+
+# --- INICIALIZAÇÃO DO BANCO DE DADOS ---
+# Cria a tabela de memória do aplicativo caso ela não exista
+if 'dados' not in st.session_state:
+    st.session_state['dados'] = pd.DataFrame(columns=["Data", "Tipo", "Categoria", "Valor"])
 
 # --- BARRA LATERAL (MENU BONITO E QUADRADO) ---
 with st.sidebar:
@@ -11,10 +17,10 @@ with st.sidebar:
     
     aba_selecionada = option_menu(
         menu_title="Meu Financeiro",
-        options=["Painel", "Controle", "Lançamentos"],
-        icons=["bar-chart-line-fill", "sliders", "plus-circle-fill"],
+        options=["Painel", "Lançamentos", "Banco de Dados"],
+        icons=["bar-chart-line-fill", "plus-circle-fill", "database-fill"],
         menu_icon="wallet-fill",
-        default_index=2, # Mudei para 2 para abrir direto nos Lançamentos e facilitar os seus testes
+        default_index=2, # Abrirá direto no Banco de Dados para você testar
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
@@ -38,54 +44,101 @@ with st.sidebar:
 # --- ABA 1: PAINEL ---
 if aba_selecionada == "Painel":
     st.title("📊 Painel")
-    st.info("🚧 Tela em desenvolvimento. Aqui ficarão os gráficos de resumo.")
+    st.info("🚧 Tela em desenvolvimento. Aqui ficarão os gráficos de resumo e os alertas de gastos.")
 
-# --- ABA 2: CONTROLE ---
-elif aba_selecionada == "Controle":
-    st.title("⚙️ Controle")
-    st.info("🚧 Tela em desenvolvimento. Aqui ficará o histórico de transações e a opção de baixar os dados.")
-
-# --- ABA 3: LANÇAMENTOS ---
+# --- ABA 2: LANÇAMENTOS ---
 elif aba_selecionada == "Lançamentos":
     st.title("➕ Lançamentos")
     st.write("Registre suas movimentações financeiras.")
 
-    # Cria duas abas separadas na tela para Entradas e Saídas
     aba_entrada, aba_saida = st.tabs(["Entradas 📈", "Saídas 📉"])
 
     # -- FORMULÁRIO DE ENTRADAS --
     with aba_entrada:
         with st.form("form_entrada"):
             st.subheader("Nova Receita")
-            # Adicionei o campo de data para ficar completo
             data_entrada = st.date_input("Data da Entrada", date.today())
-            
-            # Caixa de seleção com as suas categorias
             categoria_entrada = st.selectbox("Categoria", ["Salário", "Investimento", "Outros"])
-            
-            # Campo de valor (permite centavos e não aceita valor negativo)
             valor_entrada = st.number_input("Valor (R$)", min_value=0.0, format="%.2f")
             
-            # Botão de salvar (use_container_width=True deixa ele largo, ótimo para celular)
-            salvar_entrada = st.form_submit_button("Salvar Entrada", use_container_width=True)
-            
-            if salvar_entrada:
+            if st.form_submit_button("Salvar Entrada", use_container_width=True):
                 if valor_entrada > 0:
-                    st.success(f"✅ Entrada de R$ {valor_entrada:.2f} ({categoria_entrada}) registrada provisoriamente!")
+                    nova_linha = pd.DataFrame({
+                        "Data": [data_entrada.strftime("%Y-%m-%d")],
+                        "Tipo": ["Receita"],
+                        "Categoria": [categoria_entrada],
+                        "Valor": [valor_entrada]
+                    })
+                    # Adiciona a nova entrada ao Banco de Dados
+                    st.session_state['dados'] = pd.concat([st.session_state['dados'], nova_linha], ignore_index=True)
+                    st.success(f"✅ Entrada de R$ {valor_entrada:.2f} salva com sucesso!")
                 else:
                     st.error("O valor precisa ser maior que zero.")
 
-    # -- FORMULÁRIO DE SAÍDAS (PRÓXIMO PASSO) --
+    # -- FORMULÁRIO DE SAÍDAS --
     with aba_saida:
         with st.form("form_saida"):
             st.subheader("Nova Despesa")
-            st.info("Configuraremos as categorias aqui baseando-se no seu arquivo Organização financeira!")
-            
             data_saida = st.date_input("Data da Saída", date.today())
-            categoria_saida = st.text_input("Categoria (Provisório)")
+            
+            # Deixei um campo de texto provisório. Podemos colocar as opções do seu arquivo aqui depois.
+            categoria_saida = st.text_input("Categoria da Despesa")
             valor_saida = st.number_input("Valor (R$)", min_value=0.0, format="%.2f")
             
-            salvar_saida = st.form_submit_button("Salvar Saída", use_container_width=True)
+            if st.form_submit_button("Salvar Saída", use_container_width=True):
+                if valor_saida > 0 and categoria_saida != "":
+                    nova_linha = pd.DataFrame({
+                        "Data": [data_saida.strftime("%Y-%m-%d")],
+                        "Tipo": ["Despesa"],
+                        "Categoria": [categoria_saida],
+                        "Valor": [valor_saida]
+                    })
+                    # Adiciona a nova saída ao Banco de Dados
+                    st.session_state['dados'] = pd.concat([st.session_state['dados'], nova_linha], ignore_index=True)
+                    st.success(f"✅ Saída de R$ {valor_saida:.2f} salva com sucesso!")
+                else:
+                    st.error("Preencha a categoria e insira um valor maior que zero.")
+
+# --- ABA 3: BANCO DE DADOS ---
+elif aba_selecionada == "Banco de Dados":
+    st.title("🗄️ Banco de Dados")
+    st.write("Visualize, exporte e importe todos os seus registros.")
+
+    # Exibe a tabela atual se houver dados
+    if not st.session_state['dados'].empty:
+        st.dataframe(st.session_state['dados'], use_container_width=True, hide_index=True)
+    else:
+        st.info("Nenhum dado registrado ainda. Vá até 'Lançamentos' e faça o primeiro registro!")
+
+    st.divider()
+
+    # -- SEÇÃO DE EXPORTAÇÃO --
+    st.subheader("📤 Exportar Dados")
+    st.write("Baixe tudo o que você cadastrou para uma planilha de Excel/CSV.")
+    csv = st.session_state['dados'].to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Baixar Planilha CSV",
+        data=csv,
+        file_name="meu_controle_financeiro.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+    st.divider()
+
+    # -- SEÇÃO DE IMPORTAÇÃO --
+    st.subheader("📥 Importar Dados")
+    st.write("Envie uma planilha CSV antiga para dentro do aplicativo.")
+    arquivo_upload = st.file_uploader("Escolha um arquivo .CSV", type=["csv"])
+    
+    if arquivo_upload is not None:
+        try:
+            df_importado = pd.read_csv(arquivo_upload)
             
-            if salvar_saida:
-                st.success("Saída registrada provisoriamente!")
+            # Botão de confirmação para evitar substituições acidentais
+            if st.button("Substituir dados atuais pela planilha", use_container_width=True):
+                st.session_state['dados'] = df_importado
+                st.success("Dados importados com sucesso!")
+                st.rerun() # Atualiza a tela para exibir a nova tabela
+        except Exception as e:
+            st.error("Erro ao ler o arquivo. Certifique-se de que é um formato CSV válido.")
