@@ -17,10 +17,10 @@ with st.sidebar:
     
     aba_selecionada = option_menu(
         menu_title="Meu Financeiro",
-        options=["Painel", "Lançamentos", "Banco de Dados"],
-        icons=["bar-chart-line-fill", "plus-circle-fill", "database-fill"],
+        options=["Painel", "Lançamentos", "Controles", "Banco de Dados"], # Adicionado 'Controles'
+        icons=["bar-chart-line-fill", "plus-circle-fill", "sliders", "database-fill"], # Ícone de sliders para controles
         menu_icon="wallet-fill",
-        default_index=1, # Abre direto nos Lançamentos
+        default_index=2, # Abre direto na aba Controles para você ver
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
@@ -79,10 +79,7 @@ elif aba_selecionada == "Lançamentos":
         with st.form("form_saida"):
             st.subheader("Nova Despesa")
             data_saida = st.date_input("Data da Saída", date.today())
-            
-            # Nova caixa de seleção com as suas categorias de saída
             categoria_saida = st.selectbox("Categoria", ["Apartamento", "Moto ou Carro", "Estudos", "Lazer", "Cartão"])
-            
             valor_saida = st.number_input("Valor (R$)", min_value=0.0, format="%.2f")
             
             if st.form_submit_button("Salvar Saída", use_container_width=True):
@@ -98,7 +95,12 @@ elif aba_selecionada == "Lançamentos":
                 else:
                     st.error("O valor precisa ser maior que zero.")
 
-# --- ABA 3: BANCO DE DADOS ---
+# --- ABA 3: CONTROLES ---
+elif aba_selecionada == "Controles":
+    st.title("⚙️ Controles")
+    st.info("🚧 Tela em desenvolvimento. O que você quer colocar aqui? (Ex: Definir limites de gastos, deletar itens errados, gerenciar categorias...)")
+
+# --- ABA 4: BANCO DE DADOS ---
 elif aba_selecionada == "Banco de Dados":
     st.title("🗄️ Banco de Dados")
     st.write("Visualize, exporte e importe todos os seus registros.")
