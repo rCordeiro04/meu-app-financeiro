@@ -33,29 +33,18 @@ def formatar_moeda(valor):
 # --- ESTILO GLOBAL MELHORADO ---
 st.markdown("""
     <style>
-    /* Suaviza as abas nativas do Streamlit */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px 8px 0 0;
-        padding-top: 10px;
-        padding-bottom: 10px;
-    }
-    /* Estilo premium para as colunas que guardam os gráficos */
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] { border-radius: 8px 8px 0 0; padding-top: 10px; padding-bottom: 10px; }
     [data-testid="stColumn"] {
         background: linear-gradient(145deg, #ffffff, #f0f2f6);
-        border-radius: 24px;
-        padding: 20px 10px;
+        border-radius: 24px; padding: 20px 10px;
         box-shadow: 0 8px 25px rgba(0,0,0,0.05);
-        border: 1px solid #e9ecef;
-        margin-bottom: 15px;
+        border: 1px solid #e9ecef; margin-bottom: 15px;
     }
     @media (prefers-color-scheme: dark) {
         [data-testid="stColumn"] {
             background: linear-gradient(145deg, #1e1e1e, #121212);
-            border: 1px solid #2d2d2d;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+            border: 1px solid #2d2d2d; box-shadow: 0 8px 25px rgba(0,0,0,0.3);
         }
     }
     </style>
@@ -69,7 +58,7 @@ with st.sidebar:
         options=["Painel", "Lançamentos", "Controles"],
         icons=["pie-chart-fill", "plus-circle-fill", "ui-checks-grid"],
         menu_icon="wallet-fill",
-        default_index=0, 
+        default_index=1, 
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#6c757d", "font-size": "22px"}, 
@@ -106,7 +95,7 @@ if aba_selecionada == "Painel":
         total_saidas = df_filtrado[df_filtrado['Tipo'].isin(['Despesa', 'Despesa Fixa'])]['Valor'].sum()
         liquido = total_entradas - total_saidas
 
-        # --- CARTÕES PREMIUM (GLASSMORPHISM & GRADIENTS) ---
+        # --- CARTÕES PREMIUM ---
         html_cards = f"""
         <style>
         .cards-wrapper {{ display: flex; flex-direction: row; justify-content: space-between; gap: 12px; margin-top: 5px; margin-bottom: 30px; overflow-x: auto; padding-bottom: 15px; }}
@@ -136,15 +125,13 @@ if aba_selecionada == "Painel":
         """
         st.markdown(html_cards, unsafe_allow_html=True)
         
-        # --- LINHA 1: GRÁFICOS DE PIZZA (MODERNOS & FATIADOS) ---
+        # --- GRÁFICOS DE PIZZA ---
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 5px;'>Despesas</h4>", unsafe_allow_html=True)
             df_despesas = df_filtrado[df_filtrado['Tipo'].isin(['Despesa', 'Despesa Fixa'])]
             if not df_despesas.empty and df_despesas['Valor'].sum() > 0:
-                # Mudado para pizza (sem o hole) e com paleta vibrante
                 fig1 = px.pie(df_despesas, values='Valor', names='Categoria', color_discrete_sequence=px.colors.qualitative.Pastel)
-                # Adiciona borda branca elegante para simular profundidade (fatias separadas)
                 fig1.update_traces(textposition='inside', textinfo='percent', marker=dict(line=dict(color='#FFFFFF', width=2)))
                 fig1.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10), height=230, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig1, use_container_width=True)
@@ -170,7 +157,7 @@ if aba_selecionada == "Painel":
             df_financeiro_agrup = df_financeiro.copy()
             df_financeiro_agrup['Tipo'] = df_financeiro_agrup['Tipo'].replace({'Receita': 'Entradas', 'Despesa': 'Saídas', 'Despesa Fixa': 'Saídas'})
             df_agrupado = df_financeiro_agrup.groupby(['Periodo', 'Tipo'], as_index=False)['Valor'].sum()
-            df_agrupado['MesAno'] = df_agrupado['Periodo'].dt.strftime('%b/%y') # Formato mais limpo e curto
+            df_agrupado['MesAno'] = df_agrupado['Periodo'].dt.strftime('%b/%y') 
             
             fig3 = px.bar(df_agrupado, x='MesAno', y='Valor', color='Tipo', barmode='group', color_discrete_map={"Entradas": "#10b981", "Saídas": "#ef4444"})
             fig3.update_traces(marker_line_width=0, opacity=0.9, texttemplate='%{y:$.2s}', textposition='outside')
@@ -194,7 +181,6 @@ if aba_selecionada == "Painel":
                 df_evo = pd.DataFrame(dados_evolucao)
                 
                 fig4 = px.area(df_evo, x='MesAno', y='Património')
-                # Gradiente mais sofisticado e linha mais fina
                 fig4.update_traces(line=dict(color='#8b5cf6', width=3), fillcolor='rgba(139, 92, 246, 0.3)', mode='lines+markers', marker=dict(size=6, color='#8b5cf6', symbol='circle'))
                 fig4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=10, b=10, l=0, r=0), height=260, xaxis_title="", yaxis_title="")
                 fig4.update_xaxes(showgrid=False, type='category')
@@ -292,16 +278,27 @@ elif aba_selecionada == "Lançamentos":
                         st.rerun()
 
     with aba_banco:
-        st.subheader("Base de Dados Completa")
+        st.subheader("Gestão da Base de Dados")
         df_banco = carregar_dados()
+        
         if not df_banco.empty:
             st.dataframe(df_banco, use_container_width=True, hide_index=True)
         else:
-            st.info("Ainda sem registos.")
+            st.info("A base de dados está vazia.")
 
         st.divider()
-        csv = df_banco.to_csv(index=False).encode('utf-8')
-        st.download_button(label="📥 Exportar para Excel/Planilhas (.CSV)", data=csv, file_name="financas_consolidadas.csv", mime="text/csv", use_container_width=True, type="primary")
+        st.subheader("Ferramentas")
+        col1, col2 = st.columns(2)
+        with col1:
+            csv = df_banco.to_csv(index=False).encode('utf-8')
+            st.download_button(label="📥 Exportar (.CSV)", data=csv, file_name="financas_consolidadas.csv", mime="text/csv", use_container_width=True, type="primary")
+        with col2:
+            # BOTÃO PARA LIMPAR OS DADOS DE TESTE
+            if st.button("🗑️ Apagar Tudo", use_container_width=True):
+                df_vazio = pd.DataFrame(columns=["Data", "Tipo", "Categoria", "Detalhe", "Valor"])
+                salvar_dados(df_vazio)
+                st.success("✅ Base de dados limpa com sucesso!")
+                st.rerun()
 
 # --- ABA 3: CONTROLES DE CONTAS MENSAIS ---
 elif aba_selecionada == "Controles":
