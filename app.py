@@ -4,60 +4,26 @@ from streamlit_option_menu import option_menu
 from datetime import date
 import plotly.express as px
 import os
-import json
 
 # Configuração da página para telemóvel
 st.set_page_config(page_title="Controlo Financeiro", layout="centered", initial_sidebar_state="expanded")
 
-# --- SISTEMAS DE ARMAZENAMENTO FÍSICO ---
+# --- SISTEMA DE ARMAZENAMENTO ÚNICO (GOOGLE PLANILHAS READY) ---
 ARQUIVO_DADOS = "meu_banco_de_dados.csv"
-ARQUIVO_CONTROLES = "meus_controles.json"
 
 def carregar_dados():
     if os.path.exists(ARQUIVO_DADOS):
         return pd.read_csv(ARQUIVO_DADOS)
     else:
-        return pd.DataFrame(columns=["Data", "Tipo", "Categoria", "Valor"])
+        return pd.DataFrame(columns=["Data", "Tipo", "Categoria", "Detalhe", "Valor"])
 
 def salvar_dados(df):
     df.to_csv(ARQUIVO_DADOS, index=False)
 
-def carregar_controles():
-    padrao = {
-        "contas_pagas": {},
-        "investimentos": {} 
-    }
-    if os.path.exists(ARQUIVO_CONTROLES):
-        try:
-            with open(ARQUIVO_CONTROLES, 'r', encoding='utf-8') as f:
-                dados = json.load(f)
-                if "contas_pagas" not in dados: dados["contas_pagas"] = {}
-                
-                # Limpa automaticamente itens antigos padrão se estiverem zerados ou presentes
-                invs = dados.get("investimentos", {})
-                itens_padrao_antigos = ["Reserva de Emergência", "CDB / Tesouro", "Ações / FIIs"]
-                
-                # Se contiver apenas os itens antigos zerados, limpa-os para começar do zero
-                if all(k in itens_padrao_antigos for k in invs.keys()) or not invs:
-                    # Verifica se estão todos a 0 para limpar sem perder dinheiro real do utilizador
-                    tem_valor = any(v.get("atual", 0) > 0 for v in invs.values() if isinstance(v, dict))
-                    if not tem_valor:
-                        invs = {}
-
-                dados["investimentos"] = invs
-                return dados
-        except Exception:
-            return padrao
-    return padrao
-
-def salvar_controles(dados):
-    with open(ARQUIVO_CONTROLES, 'w', encoding='utf-8') as f:
-        json.dump(dados, f, ensure_ascii=False, indent=4)
-
 def formatar_moeda(valor):
     return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- BARRA LATERAL (MENU BONITO E QUADRADO) ---
+# --- BARRA LATERAL (MENU) ---
 with st.sidebar:
     st.write("") 
     
@@ -66,7 +32,7 @@ with st.sidebar:
         options=["Painel", "Lançamentos", "Controles"],
         icons=["bar-chart-line-fill", "plus-circle-fill", "sliders"],
         menu_icon="wallet-fill",
-        default_index=2, 
+        default_index=1, 
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
@@ -81,19 +47,22 @@ if aba_selecionada == "Painel":
     df_completo = carregar_dados()
     
     if df_completo.empty:
-        st.info("Nenhum dado registado ainda. Vá até 'Lançamentos' e faça o primeiro registo para ver os gráficos!")
+        st.info("Nenhum dado registado ainda. Vá até 'Lançamentos' e faça o primeiro registo!")
     else:
         df_completo['Data'] = pd.to_datetime(df_completo['Data'])
         df_completo = df_completo.sort_values('Data')
         df_completo['MesAno'] = df_completo['Data'].dt.strftime('%m/%Y')
         
+        # Filtra apenas Receitas e Despesas para os gráficos financeiros do painel
+        df_financeiro = df_completo[df_completo['Tipo'].isin(['Receita', 'Despesa'])]
+        
         meses_disponiveis = ["Todos os Meses"] + sorted(list(df_completo['MesAno'].unique()), reverse=True)
-        mes_selecionado = st.selectbox("📅 Filtrar Mês (Balões e Gráficos de Rosca)", meses_disponiveis)
+        mes_selecionado = st.selectbox("📅 Filtrar Mês", meses_disponiveis)
         
         if mes_selecionado != "Todos os Meses":
-            df_filtrado = df_completo[df_completo['MesAno'] == mes_selecionado]
+            df_filtrado = df_financeiro[df_financeiro['MesAno'] == mes_selecionado]
         else:
-            df_filtrado = df_completo.copy()
+            df_filtrado = df_financeiro.copy()
             
         total_entradas = df_filtrado[df_filtrado['Tipo'] == 'Receita']['Valor'].sum()
         total_saidas = df_filtrado[df_filtrado['Tipo'] == 'Despesa']['Valor'].sum()
@@ -104,10 +73,10 @@ if aba_selecionada == "Painel":
         .cards-wrapper {{ display: flex; flex-direction: row; justify-content: space-between; gap: 10px; margin-top: 10px; margin-bottom: 25px; overflow-x: auto; padding-bottom: 10px; }}
         .cards-wrapper::-webkit-scrollbar {{ display: none; }}
         .cards-wrapper {{ -ms-overflow-style: none; scrollbar-width: none; }}
-        .card-custom {{ flex: 1; min-width: 95px; background-color: #ffffff; border-radius: 16px; padding: 15px 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #f8f9fa; transition: transform 0.2s ease; }}
-        @media (prefers-color-scheme: dark) {{ .card-custom {{ background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }} }}
+        .card-custom {{ flex: 1; min-width: 95px; background-color: #ffffff; border-radius: 16px; padding: 15px 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #f8f9fa; }}
+        @media (prefers-color-scheme: dark) {{ .card-custom {{ background-color: #1a1a1a; border: 1px solid #2d2d2d; }} }}
         .card-icon {{ font-size: 22px; margin-bottom: 4px; }}
-        .card-title {{ font-size: 11px; color: #888; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; text-align: center; }}
+        .card-title {{ font-size: 11px; color: #888; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; text-align: center; }}
         .card-value {{ font-size: 16px; font-weight: 800; text-align: center; }}
         .text-green {{ color: #20c997; }} .text-red {{ color: #ff6b6b; }} .text-blue {{ color: #339af0; }}
         </style>
@@ -122,12 +91,11 @@ if aba_selecionada == "Painel":
         st.markdown("""
         <style>
         [data-testid="stColumn"] { background-color: #ffffff; border-radius: 20px; padding: 20px 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); border: 1px solid #f0f2f6; margin-bottom: 15px; }
-        @media (prefers-color-scheme: dark) { [data-testid="stColumn"] { background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); } }
+        @media (prefers-color-scheme: dark) { [data-testid="stColumn"] { background-color: #1a1a1a; border: 1px solid #2d2d2d; } }
         </style>
         """, unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
-
         with col1:
             st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Despesas</h4>", unsafe_allow_html=True)
             df_despesas = df_filtrado[df_filtrado['Tipo'] == 'Despesa']
@@ -137,212 +105,144 @@ if aba_selecionada == "Painel":
                 fig1.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10), height=220, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig1, use_container_width=True)
             else:
-                st.info("Sem saídas no período.")
+                st.info("Sem saídas.")
 
         with col2:
             st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Renda vs Gastos</h4>", unsafe_allow_html=True)
             if total_entradas > 0 or total_saidas > 0:
                 df_comparacao = pd.DataFrame({"Tipo": ["Entradas", "Saídas"], "Valor": [total_entradas, total_saidas]})
-                df_comparacao = df_comparacao[df_comparacao['Valor'] > 0]
                 fig2 = px.pie(df_comparacao, values='Valor', names='Tipo', hole=0.65, color='Tipo', color_discrete_map={"Entradas": "#20c997", "Saídas": "#ff6b6b"})
                 fig2.update_traces(textposition='inside', textinfo='percent', hoverinfo='label+percent+value')
                 fig2.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10), height=220, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig2, use_container_width=True)
             else:
-                st.info("Sem dados no período.")
+                st.info("Sem dados.")
 
-        st.markdown("<h3 style='font-size: 18px; margin-top: 20px; margin-bottom: 5px; color: #555;'>Evolução Histórica</h3>", unsafe_allow_html=True)
-
-        col3, col4 = st.columns(2)
-
-        with col3:
-            st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Comparativo Anual</h4>", unsafe_allow_html=True)
-            df_agrupado = df_completo.groupby(['MesAno', 'Tipo'], as_index=False)['Valor'].sum()
-            df_agrupado['Tipo'] = df_agrupado['Tipo'].replace({'Receita': 'Entradas', 'Despesa': 'Saídas'})
-            fig3 = px.bar(df_agrupado, x='MesAno', y='Valor', color='Tipo', barmode='group', color_discrete_map={"Entradas": "#20c997", "Saídas": "#ff6b6b"})
-            fig3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=10, b=10, l=0, r=0), height=240, legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5, title=""), xaxis_title="", yaxis_title="")
-            fig3.update_xaxes(showgrid=False)
-            fig3.update_yaxes(showgrid=True, gridcolor='rgba(200,200,200,0.1)')
-            st.plotly_chart(fig3, use_container_width=True)
-
-        with col4:
-            st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Evolução do Guardado</h4>", unsafe_allow_html=True)
-            df_pivot = df_completo.pivot_table(index='MesAno', columns='Tipo', values='Valor', aggfunc='sum', fill_value=0).reset_index()
-            if 'Receita' not in df_pivot.columns: df_pivot['Receita'] = 0
-            if 'Despesa' not in df_pivot.columns: df_pivot['Despesa'] = 0
-            df_pivot['Guardado'] = df_pivot['Receita'] - df_pivot['Despesa']
-            fig4 = px.bar(df_pivot, x='MesAno', y='Guardado')
-            fig4.update_traces(marker_color='#b197fc')
-            fig4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=10, b=10, l=0, r=0), height=240, xaxis_title="", yaxis_title="")
-            fig4.update_xaxes(showgrid=False)
-            fig4.update_yaxes(showgrid=True, gridcolor='rgba(200,200,200,0.1)')
-            st.plotly_chart(fig4, use_container_width=True)
-
-# --- ABA 2: LANÇAMENTOS ---
+# --- ABA 2: LANÇAMENTOS (TUDO UNIFICADO NO ARQUIVO) ---
 elif aba_selecionada == "Lançamentos":
-    st.title("➕ Lançamentos")
-    st.write("Registe e consulte as suas movimentações financeiras.")
+    st.title("➕ Lançamentos e Base")
+    st.write("Registe entradas, saídas e investimentos. Tudo é guardado num único ficheiro para o Google Planilhas.")
 
-    aba_entrada, aba_saida, aba_banco = st.tabs(["Entradas 📈", "Saídas 📉", "Base de Dados 🗄️"])
+    aba_entrada, aba_saida, aba_invest, aba_banco = st.tabs(["Entradas 📈", "Saídas 📉", "Investimentos 🚀", "Base de Dados 🗄️"])
 
     with aba_entrada:
         with st.form("form_entrada"):
             st.subheader("Nova Receita")
-            data_entrada = st.date_input("Data da Entrada", date.today())
-            categoria_entrada = st.selectbox("Categoria", ["Salário", "Investimento", "Outros"])
-            valor_entrada = st.number_input("Valor (R$)", min_value=0.0, format="%.2f")
+            data_entrada = st.date_input("Data", date.today())
+            cat_entrada = st.selectbox("Categoria", ["Salário", "Investimento", "Outros"])
+            val_entrada = st.number_input("Valor (R$)", min_value=0.0, format="%.2f")
             
             if st.form_submit_button("Salvar Entrada", use_container_width=True):
-                if valor_entrada > 0:
+                if val_entrada > 0:
                     df = carregar_dados()
-                    nova_linha = pd.DataFrame({"Data": [data_entrada.strftime("%Y-%m-%d")], "Tipo": ["Receita"], "Categoria": [categoria_entrada], "Valor": [valor_entrada]})
+                    nova_linha = pd.DataFrame({
+                        "Data": [data_entrada.strftime("%Y-%m-%d")],
+                        "Tipo": ["Receita"],
+                        "Categoria": [cat_entrada],
+                        "Detalhe": [""],
+                        "Valor": [val_entrada]
+                    })
                     df = pd.concat([df, nova_linha], ignore_index=True)
                     salvar_dados(df)
-                    st.success(f"✅ Entrada salva com sucesso!")
+                    st.success("✅ Entrada registada com sucesso!")
 
     with aba_saida:
         with st.form("form_saida"):
             st.subheader("Nova Despesa")
-            data_saida = st.date_input("Data da Saída", date.today())
-            categoria_saida = st.selectbox("Categoria", ["Apartamento", "Moto ou Carro", "Estudos", "Lazer", "Cartão"])
-            valor_saida = st.number_input("Valor (R$)", min_value=0.0, format="%.2f")
+            data_saida = st.date_input("Data", date.today())
+            cat_saida = st.selectbox("Categoria", ["Apartamento", "Moto ou Carro", "Estudos", "Lazer", "Cartão"])
+            val_saida = st.number_input("Valor (R$)", min_value=0.0, format="%.2f")
             
             if st.form_submit_button("Salvar Saída", use_container_width=True):
-                if valor_saida > 0:
+                if val_saida > 0:
                     df = carregar_dados()
-                    nova_linha = pd.DataFrame({"Data": [data_saida.strftime("%Y-%m-%d")], "Tipo": ["Despesa"], "Categoria": [categoria_saida], "Valor": [valor_saida]})
+                    nova_linha = pd.DataFrame({
+                        "Data": [data_saida.strftime("%Y-%m-%d")],
+                        "Tipo": ["Despesa"],
+                        "Categoria": [cat_saida],
+                        "Detalhe": [""],
+                        "Valor": [val_saida]
+                    })
                     df = pd.concat([df, nova_linha], ignore_index=True)
                     salvar_dados(df)
-                    st.success(f"✅ Saída salva com sucesso!")
+                    st.success("✅ Despesa registada com sucesso!")
+
+    with aba_invest:
+        with st.form("form_investimento"):
+            st.subheader("Registar Aporte em Investimento")
+            data_inv = st.date_input("Data do Aporte", date.today())
+            nome_inv = st.text_input("Nome da Meta/Investimento (ex: Ações, Imóvel)")
+            val_inv = st.number_input("Valor Guardado/Aporte (R$)", min_value=0.0, format="%.2f")
+            
+            if st.form_submit_button("Guardar Aporte", use_container_width=True):
+                if val_inv > 0 and nome_inv:
+                    df = carregar_dados()
+                    nova_linha = pd.DataFrame({
+                        "Data": [data_inv.strftime("%Y-%m-%d")],
+                        "Tipo": ["Investimento"],
+                        "Categoria": ["Meta de Investimento"],
+                        "Detalhe": [nome_inv],
+                        "Valor": [val_inv]
+                    })
+                    df = pd.concat([df, nova_linha], ignore_index=True)
+                    salvar_dados(df)
+                    st.success(f"✅ Aporte em '{nome_inv}' registado com sucesso!")
 
     with aba_banco:
-        st.subheader("Consultar Registos")
+        st.subheader("Base de Dados Completa")
         df_banco = carregar_dados()
         if not df_banco.empty:
             st.dataframe(df_banco, use_container_width=True, hide_index=True)
         else:
-            st.info("Nenhum dado registado ainda.")
+            st.info("Ainda sem registos.")
 
         st.divider()
-        st.subheader("📤 Exportar Dados")
+        st.subheader("📤 Exportar para Google Planilhas")
         csv = df_banco.to_csv(index=False).encode('utf-8')
-        st.download_button(label="📥 Baixar Planilha CSV", data=csv, file_name="meu_controle_financeiro.csv", mime="text/csv", use_container_width=True)
-
-        st.divider()
-        st.subheader("📥 Importar Dados")
-        arquivo_upload = st.file_uploader("Escolha um ficheiro .CSV", type=["csv"])
-        if arquivo_upload is not None:
-            df_importado = pd.read_csv(arquivo_upload)
-            if st.button("Substituir dados atuais pela planilha", use_container_width=True):
-                salvar_dados(df_importado)
-                st.success("Dados importados e salvos com sucesso!")
-                st.rerun()
+        st.download_button(
+            label="📥 Baixar CSV Consolidado", 
+            data=csv, 
+            file_name="meu_controle_financeiro_geral.csv", 
+            mime="text/csv", 
+            use_container_width=True
+        )
+        st.caption("Dica: Faça o download deste ficheiro e importe-o diretamente no Google Planilhas para ter todos os dados num único lugar.")
 
 # --- ABA 3: CONTROLES ---
 elif aba_selecionada == "Controles":
     st.title("⚙️ Controles")
-    st.write("Acompanhe o pagamento das contas e planeie os seus investimentos.")
+    st.write("Acompanhe o pagamento das contas mensais.")
 
-    controles = carregar_controles()
-
-    aba_contas, aba_invest = st.tabs(["Contas do Mês ✅", "Investimentos e Metas 🚀"])
-
-    with aba_contas:
-        st.subheader("Checklist de Pagamentos")
-        
-        mes_atual_str = date.today().strftime('%m/%Y')
-        mes_input = st.text_input("Mês de Referência (MM/AAAA)", value=mes_atual_str)
-        
-        if mes_input not in controles["contas_pagas"]:
-            controles["contas_pagas"][mes_input] = {
-                "Apartamento": False, 
-                "Evolução de obra": False, 
-                "Moto/Carro": False, 
-                "Faculdade": False
-            }
-            salvar_controles(controles)
-
-        st.info(f"Marque as contas pagas referentes a **{mes_input}**.")
-        
-        contas_do_mes = controles["contas_pagas"][mes_input]
-        for conta, status in list(contas_do_mes.items()):
-            novo_status = st.checkbox(conta, value=status, key=f"chk_{mes_input}_{conta}")
-            controles["contas_pagas"][mes_input][conta] = novo_status
+    df_geral = carregar_dados()
+    
+    mes_atual_str = date.today().strftime('%m/%Y')
+    mes_input = st.text_input("Mês de Referência (MM/AAAA)", value=mes_atual_str)
+    
+    st.subheader(f"Contas de {mes_input}")
+    
+    # Lista fixa de controle de contas exigida
+    contas_padrao = ["Apartamento", "Evolução de obra", "Moto/Carro", "Faculdade"]
+    
+    for conta in contas_padrao:
+        # Verifica no banco unificado se já existe registo de pagamento para esta conta neste mês
+        filtro_conta = (df_geral['Tipo'] == 'Checklist') & (df_geral['Categoria'] == mes_input) & (df_geral['Detalhe'] == conta)
+        status_atual = False
+        if not df_geral[filtro_conta].empty:
+            status_atual = bool(df_geral[filtro_conta]['Valor'].values[0] == 1.0)
             
-        salvar_controles(controles)
-
-        total_contas = len(contas_do_mes)
-        contas_pagas = sum(contas_do_mes.values())
+        novo_status = st.checkbox(conta, value=status_atual, key=f"chk_{mes_input}_{conta}")
         
-        if total_contas > 0:
-            percentual = contas_pagas / total_contas
-            st.progress(percentual, text=f"Progresso de {mes_input}: {contas_pagas} de {total_contas} contas pagas")
-            if percentual == 1.0:
-                st.success(f"🎉 Parabéns! Todas as contas de {mes_input} foram quitadas.")
-
-        st.divider()
-        nova_conta = st.text_input("Adicionar outra conta a este mês:")
-        if st.button("Adicionar Conta", use_container_width=True):
-            if nova_conta and nova_conta not in controles["contas_pagas"][mes_input]:
-                controles["contas_pagas"][mes_input][nova_conta] = False
-                salvar_controles(controles)
-                st.rerun()
-
-    with aba_invest:
-        st.subheader("Planeamento de Investimentos e Metas")
-        
-        investimentos_dict = controles.get("investimentos", {})
-        
-        if investimentos_dict:
-            st.write("Consulte os seus objetivos, prazos e valores acumulados.")
-            for inv_nome, inv_info in investimentos_dict.items():
-                atual = inv_info.get("atual", 0.0)
-                meta = inv_info.get("meta", 1.0)
-                prazo = inv_info.get("prazo", "Sem prazo")
-                
-                progresso = min(atual / meta, 1.0) if meta > 0 else 0.0
-                
-                with st.container():
-                    st.markdown(f"**{inv_nome}** (Prazo: *{prazo}*)")
-                    st.progress(progresso, text=f"Guardado: R$ {formatar_moeda(atual)} / Meta: R$ {formatar_moeda(meta)} ({int(progresso * 100)}%)")
-                st.divider()
-        else:
-            st.info("Ainda não existem investimentos criados. Utilize o formulário abaixo para registar a sua primeira meta.")
-
-        st.subheader("Criar Novo Objetivo de Investimento")
-        with st.form("form_novo_investimento"):
-            nome_novo = st.text_input("Nome do Investimento/Meta (ex: Comprar Carro)")
-            meta_novo = st.number_input("Valor da Meta (R$)", min_value=0.0, step=100.0, format="%.2f")
-            prazo_novo = st.text_input("Prazo (ex: Dezembro de 2027, 24 meses...)")
-            
-            if st.form_submit_button("Criar Nova Meta", use_container_width=True):
-                if nome_novo and nome_novo not in investimentos_dict:
-                    controles["investimentos"][nome_novo] = {
-                        "atual": 0.0,
-                        "meta": meta_novo if meta_novo > 0 else 1.0,
-                        "prazo": prazo_novo if prazo_novo else "Não definido"
-                    }
-                    salvar_controles(controles)
-                    st.success(f"✅ Meta '{nome_novo}' criada com sucesso!")
-                    st.rerun()
-                else:
-                    st.error("Insira um nome válido que ainda não exista.")
-
-        if investimentos_dict:
-            st.subheader("Atualizar Valor Guardado")
-            with st.form("form_atualiza_progresso"):
-                inv_escolhido = st.selectbox("Selecionar Meta", list(investimentos_dict.keys()))
-                tipo_op = st.radio("Operação", ["Adicionar (Depositar)", "Definir Valor Exato"], horizontal=True)
-                valor_mov = st.number_input("Valor (R$)", min_value=0.0, step=50.0, format="%.2f")
-                
-                if st.form_submit_button("Atualizar Saldo", use_container_width=True):
-                    if valor_mov > 0 or tipo_op == "Definir Valor Exato":
-                        atual_atual = investimentos_dict[inv_escolhido]["atual"]
-                        if tipo_op == "Adicionar (Depositar)":
-                            controles["investimentos"][inv_escolhido]["atual"] = atual_atual + valor_mov
-                        else:
-                            controles["investimentos"][inv_escolhido]["atual"] = valor_mov
-                        
-                        salvar_controles(controles)
-                        st.success(f"✅ Progresso de '{inv_escolhido}' atualizado!")
-                        st.rerun()
+        # Atualiza o estado no DataFrame consolidado
+        if novo_status != status_atual:
+            if not df_geral[filtro_conta].empty:
+                df_geral.loc[filtro_conta, 'Valor'] = 1.0 if novo_status else 0.0
+            else:
+                nova_chk = pd.DataFrame({
+                    "Data": [date.today().strftime("%Y-%m-%d")],
+                    "Tipo": ["Checklist"],
+                    "Categoria": [mes_input],
+                    "Detalhe": [conta],
+                    "Valor": [1.0 if novo_status else 0.0]
+                })
+                df_geral = pd.concat([df_geral, nova_chk], ignore_index=True)
+            salvar_dados(df_geral)
