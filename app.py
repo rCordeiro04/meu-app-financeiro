@@ -26,13 +26,22 @@ def carregar_controles():
     if os.path.exists(ARQUIVO_CONTROLES):
         with open(ARQUIVO_CONTROLES, 'r', encoding='utf-8') as f:
             dados = json.load(f)
-            # Garante que as chaves essenciais existam para evitar erros
             if "contas_pagas" not in dados: dados["contas_pagas"] = {}
-            if "investimentos" not in dados: dados["investimentos"] = {"Reserva de Emergência": 0.0, "CDB / Tesouro": 0.0, "Ações / FIIs": 0.0}
+            if "investimentos" not in dados: 
+                # Estrutura aprimorada: nome -> {atual, meta, prazo}
+                dados["investimentos"] = {
+                    "Reserva de Emergência": {"atual": 0.0, "meta": 10000.0, "prazo": "12 meses"},
+                    "CDB / Tesouro": {"atual": 0.0, "meta": 5000.0, "prazo": "6 meses"},
+                    "Ações / FIIs": {"atual": 0.0, "meta": 20000.0, "prazo": "Longo Prazo"}
+                }
             return dados
     return {
         "contas_pagas": {},
-        "investimentos": {"Reserva de Emergência": 0.0, "CDB / Tesouro": 0.0, "Ações / FIIs": 0.0}
+        "investimentos": {
+            "Reserva de Emergência": {"atual": 0.0, "meta": 10000.0, "prazo": "12 meses"},
+            "CDB / Tesouro": {"atual": 0.0, "meta": 5000.0, "prazo": "6 meses"},
+            "Ações / FIIs": {"atual": 0.0, "meta": 20000.0, "prazo": "Longo Prazo"}
+        }
     }
 
 def salvar_controles(dados):
@@ -51,7 +60,7 @@ with st.sidebar:
         options=["Painel", "Lançamentos", "Controles"],
         icons=["bar-chart-line-fill", "plus-circle-fill", "sliders"],
         menu_icon="wallet-fill",
-        default_index=2, # Abre direto nos Controles
+        default_index=2, 
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
@@ -226,11 +235,11 @@ elif aba_selecionada == "Lançamentos":
 # --- ABA 3: CONTROLES ---
 elif aba_selecionada == "Controles":
     st.title("⚙️ Controles")
-    st.write("Acompanhe o pagamento das contas e atualize os investimentos.")
+    st.write("Acompanhe o pagamento das contas e planeie os seus investimentos.")
 
     controles = carregar_controles()
 
-    aba_contas, aba_invest = st.tabs(["Contas do Mês ✅", "Investimentos 🚀"])
+    aba_contas, aba_invest = st.tabs(["Contas do Mês ✅", "Investimentos e Metas 🚀"])
 
     with aba_contas:
         st.subheader("Checklist de Pagamentos")
@@ -274,63 +283,61 @@ elif aba_selecionada == "Controles":
                 st.rerun()
 
     with aba_invest:
-        st.subheader("Meus Investimentos")
-        st.write("Acompanhe o saldo atual de cada objetivo em formato de balões.")
+        st.subheader("Planeamento de Investimentos e Metas")
+        st.write("Consulte os seus objetivos, prazos e valores acumulados.")
 
         investimentos_dict = controles.get("investimentos", {})
         
         if investimentos_dict:
-            html_inv_cards = """
-            <style>
-            .inv-wrapper { display: flex; flex-direction: row; justify-content: space-between; gap: 10px; margin-top: 10px; margin-bottom: 25px; overflow-x: auto; padding-bottom: 10px; }
-            .inv-wrapper::-webkit-scrollbar { display: none; }
-            .inv-card { flex: 1; min-width: 110px; background-color: #ffffff; border-radius: 16px; padding: 15px 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #f8f9fa; }
-            @media (prefers-color-scheme: dark) { .inv-card { background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 4px 10px rgba(0,0,0,0.2); } }
-            .inv-title { font-size: 11px; color: #888; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; text-align: center; }
-            .inv-value { font-size: 15px; font-weight: 800; text-align: center; color: #b197fc; }
-            </style>
-            <div class="inv-wrapper">
-            """
-            
-            for inv_nome, inv_val in investimentos_dict.items():
-                html_inv_cards += f"""
-                <div class="inv-card">
-                    <div class="inv-title">{inv_nome}</div>
-                    <div class="inv-value">R$ {formatar_moeda(inv_val)}</div>
-                </div>
-                """
-            html_inv_cards += "</div>"
-            st.markdown(html_inv_cards, unsafe_allow_html=True)
-        
-        total_geral_investido = sum(investimentos_dict.values())
-        st.info(f"💎 Total guardado em investimentos: **R$ {formatar_moeda(total_geral_investido)}**")
+            for inv_nome, inv_info in investimentos_dict.items():
+                atual = inv_info.get("atual", 0.0)
+                meta = inv_info.get("meta", 1.0)
+                prazo = inv_info.get("prazo", "Sem prazo")
+                
+                # Evita divisão por zero
+                progresso = min(atual / meta, 1.0) if meta > 0 else 0.0
+                
+                with st.container():
+                    st.markdown(f"**{inv_nome}** (Prazo: *{prazo}*)")
+                    st.progress(progresso, text=f"Guardado: R$ {formatar_moeda(atual)} / Meta: R$ {formatar_moeda(meta)} ({int(progresso * 100)}%)")
+                st.divider()
 
-        st.divider()
-
-        st.subheader("Atualizar Saldo de Investimento")
-        with st.form("form_atualiza_investimento"):
-            inv_escolhido = st.selectbox("Escolha a categoria", list(investimentos_dict.keys()))
+        # --- CRIAR NOVO INVESTIMENTO (COM NOME, META E PRAZO) ---
+        st.subheader("Criar Novo Objetivo de Investimento")
+        with st.form("form_novo_investimento"):
+            nome_novo = st.text_input("Nome do Investimento/Meta (ex: Comprar Carro)")
+            meta_novo = st.number_input("Valor da Meta (R$)", min_value=0.0, step=100.0, format="%.2f")
+            prazo_novo = st.text_input("Prazo (ex: Dezembro de 2027, 24 meses...)")
             
-            tipo_operacao = st.radio("Ação", ["Adicionar (Depositar)", "Definir Valor Exato"], horizontal=True)
-            valor_movimento = st.number_input("Valor (R$)", min_value=0.0, step=50.0, format="%.2f")
-            
-            if st.form_submit_button("Atualizar Investimento", use_container_width=True):
-                if valor_movimento > 0 or tipo_operacao == "Definir Valor Exato":
-                    if tipo_operacao == "Adicionar (Depositar)":
-                        controles["investimentos"][inv_escolhido] += valor_movimento
-                    else:
-                        controles["investimentos"][inv_escolhido] = valor_movimento
-                    
+            if st.form_submit_button("Criar Nova Meta", use_container_width=True):
+                if nome_novo and nome_novo not in investimentos_dict:
+                    controles["investimentos"][nome_novo] = {
+                        "atual": 0.0,
+                        "meta": meta_novo if meta_novo > 0 else 1.0,
+                        "prazo": prazo_novo if prazo_novo else "Não definido"
+                    }
                     salvar_controles(controles)
-                    st.success(f"✅ Saldo de '{inv_escolhido}' atualizado com sucesso!")
+                    st.success(f"✅ Meta '{nome_novo}' criada com sucesso!")
                     st.rerun()
+                else:
+                    st.error("Insira um nome válido que ainda não exista.")
 
-        st.divider()
-        st.subheader("Nova Categoria")
-        novo_invest = st.text_input("Nome do novo investimento (ex: Tesouro Direto):")
-        if st.button("Criar Nova Categoria", use_container_width=True):
-            if novo_invest and novo_invest not in controles["investimentos"]:
-                controles["investimentos"][novo_invest] = 0.0
-                salvar_controles(controles)
-                st.success(f"✅ Categoria '{novo_invest}' criada!")
-                st.rerun()
+        # --- ATUALIZAR VALOR GUARDADO COM O TEMPO ---
+        st.subheader("Atualizar Valor Guardado")
+        if investimentos_dict:
+            with st.form("form_atualiza_progresso"):
+                inv_escolhido = st.selectbox("Selecionar Meta", list(investimentos_dict.keys()))
+                tipo_op = st.radio("Operação", ["Adicionar (Depositar)", "Definir Valor Exato"], horizontal=True)
+                valor_mov = st.number_input("Valor (R$)", min_value=0.0, step=50.0, format="%.2f")
+                
+                if st.form_submit_button("Atualizar Saldo", use_container_width=True):
+                    if valor_mov > 0 or tipo_op == "Definir Valor Exato":
+                        atual_atual = investimentos_dict[inv_escolhido]["atual"]
+                        if tipo_op == "Adicionar (Depositar)":
+                            controles["investimentos"][inv_escolhido]["atual"] = atual_atual + valor_mov
+                        else:
+                            controles["investimentos"][inv_escolhido]["atual"] = valor_mov
+                        
+                        salvar_controles(controles)
+                        st.success(f"✅ Progresso de '{inv_escolhido}' atualizado!")
+                        st.rerun()
