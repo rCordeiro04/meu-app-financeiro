@@ -58,7 +58,6 @@ if aba_selecionada == "Painel":
         df_completo['MesAno'] = df_completo['Data'].dt.strftime('%m/%Y')
         df_completo['Periodo'] = df_completo['Data'].dt.to_period('M')
 
-    # Integra as Despesas Normais e as Despesas Fixas (Contas do Mês) nos cálculos
     df_financeiro = df_completo[df_completo['Tipo'].isin(['Receita', 'Despesa', 'Despesa Fixa'])].copy()
     
     if df_financeiro.empty:
@@ -76,7 +75,6 @@ if aba_selecionada == "Painel":
         total_saidas = df_filtrado[df_filtrado['Tipo'].isin(['Despesa', 'Despesa Fixa'])]['Valor'].sum()
         liquido = total_entradas - total_saidas
 
-        # --- BALÕES FLUTUANTES ---
         html_cards = f"""
         <style>
         .cards-wrapper {{ display: flex; flex-direction: row; justify-content: space-between; gap: 10px; margin-top: 10px; margin-bottom: 25px; overflow-x: auto; padding-bottom: 10px; }}
@@ -98,7 +96,6 @@ if aba_selecionada == "Painel":
 
         st.markdown("<style>[data-testid='stColumn'] { background-color: #ffffff; border-radius: 20px; padding: 20px 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #f0f2f6; margin-bottom: 15px; } @media (prefers-color-scheme: dark) { [data-testid='stColumn'] { background-color: #1a1a1a; border: 1px solid #2d2d2d; } }</style>", unsafe_allow_html=True)
         
-        # --- LINHA 1: GRÁFICOS DE ROSCA ---
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Despesas</h4>", unsafe_allow_html=True)
@@ -124,12 +121,10 @@ if aba_selecionada == "Painel":
 
         st.markdown("<h3 style='font-size: 18px; margin-top: 20px; margin-bottom: 5px; color: #555;'>Evolução Histórica Anual</h3>", unsafe_allow_html=True)
 
-        # --- LINHA 2: GRÁFICO DE BARRAS (Entradas vs Saídas) ---
         col3, = st.columns(1)
         with col3:
             st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Entradas vs Saídas</h4>", unsafe_allow_html=True)
             df_financeiro_agrup = df_financeiro.copy()
-            # Unifica as Despesas Fixas na mesma coluna de Saídas
             df_financeiro_agrup['Tipo'] = df_financeiro_agrup['Tipo'].replace({'Receita': 'Entradas', 'Despesa': 'Saídas', 'Despesa Fixa': 'Saídas'})
             df_agrupado = df_financeiro_agrup.groupby(['Periodo', 'Tipo'], as_index=False)['Valor'].sum()
             df_agrupado['MesAno'] = df_agrupado['Periodo'].dt.strftime('%m/%Y')
@@ -140,7 +135,6 @@ if aba_selecionada == "Painel":
             fig3.update_yaxes(showgrid=True, gridcolor='rgba(200,200,200,0.1)')
             st.plotly_chart(fig3, use_container_width=True)
 
-        # --- LINHA 3: GRÁFICO DE ÁREA (Evolução Total Investido) ---
         col4, = st.columns(1)
         with col4:
             st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Evolução Total Investido</h4>", unsafe_allow_html=True)
@@ -214,7 +208,7 @@ elif aba_selecionada == "Lançamentos":
         csv = df_banco.to_csv(index=False).encode('utf-8')
         st.download_button(label="📥 Baixar Ficheiro Consolidado (CSV)", data=csv, file_name="meu_controle_financeiro_geral.csv", mime="text/csv", use_container_width=True)
 
-# --- ABA 3: CONTROLES (INVESTIMENTOS E CONTAS DO MÊS) ---
+# --- ABA 3: CONTROLES ---
 elif aba_selecionada == "Controles":
     st.title("⚙️ Controles")
     df_geral = carregar_dados()
@@ -277,14 +271,54 @@ elif aba_selecionada == "Controles":
         mes_input = st.text_input("Mês de Referência (MM/AAAA)", value=mes_atual_str)
         st.subheader(f"Contas Pagas em {mes_input}")
         
-        # Filtra e soma as contas registadas no mês consultado
         df_contas_mes = df_geral[(df_geral['Tipo'] == 'Despesa Fixa') & (df_geral['Detalhe'] == mes_input)]
         
         if not df_contas_mes.empty:
             total_contas = df_contas_mes['Valor'].sum()
+            
+            # --- DESIGN DO CARTÃO DE CONTAS PAGAS ---
+            html_contas = f"""
+            <style>
+            .bill-card {{
+                background-color: #ffffff;
+                border-radius: 16px;
+                padding: 20px;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+                border: 1px solid #f8f9fa;
+                margin-bottom: 20px;
+            }}
+            @media (prefers-color-scheme: dark) {{
+                .bill-card {{ background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }}
+            }}
+            .bill-total {{
+                font-size: 18px; font-weight: 800; color: #339af0; text-align: center; margin-bottom: 20px;
+            }}
+            .bill-item {{
+                display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f3f5; font-size: 15px;
+            }}
+            @media (prefers-color-scheme: dark) {{ .bill-item {{ border-bottom: 1px solid #333; }} }}
+            .bill-item:last-child {{ border-bottom: none; }}
+            .bill-name {{ font-weight: 600; color: #555; }}
+            @media (prefers-color-scheme: dark) {{ .bill-name {{ color: #ccc; }} }}
+            .bill-value {{ font-weight: 700; color: #ff6b6b; }}
+            </style>
+            
+            <div class="bill-card">
+                <div class="bill-total">💰 Total Pago: R$ {formatar_moeda(total_contas)}</div>
+            """
+            
+            # Adiciona cada conta dentro do cartão HTML
             for index, row in df_contas_mes.iterrows():
-                st.markdown(f"✅ **{row['Categoria']}**: R$ {formatar_moeda(row['Valor'])}")
-            st.info(f"💰 **Total de contas fixas pagas:** R$ {formatar_moeda(total_contas)}")
+                html_contas += f"""
+                <div class="bill-item">
+                    <span class="bill-name">✅ {row['Categoria']}</span>
+                    <span class="bill-value">R$ {formatar_moeda(row['Valor'])}</span>
+                </div>
+                """
+                
+            html_contas += "</div>"
+            st.markdown(html_contas, unsafe_allow_html=True)
+            
         else:
             st.info("Nenhuma conta registada para este mês.")
 
@@ -302,7 +336,6 @@ elif aba_selecionada == "Controles":
             if st.form_submit_button("Salvar Pagamento", use_container_width=True):
                 nome_final = conta_personalizada if conta_sugestao == "Outra..." else conta_sugestao
                 if nome_final and valor_conta > 0:
-                    # Grava a conta como 'Despesa Fixa' vinculada ao Mês (Detalhe)
                     nova_conta = pd.DataFrame({
                         "Data": [date.today().strftime("%Y-%m-%d")],
                         "Tipo": ["Despesa Fixa"],
