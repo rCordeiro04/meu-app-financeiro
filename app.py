@@ -261,8 +261,8 @@ elif aba_selecionada == "Lançamentos":
 
 # --- ABA 3: CONTROLES DE CONTAS MENSAIS ---
 elif aba_selecionada == "Controles":
-    st.title("⚙️ Controles de Contas")
-    st.write("Acompanhe e registe o pagamento das suas contas fixas mensais.")
+    st.title("⚙️️ Controles de Contas")
+    st.write("Acompanhe as suas contas fixas mensais.")
     df_geral = carregar_dados()
 
     # Variáveis de sessão para o Mês e Ano
@@ -271,7 +271,7 @@ elif aba_selecionada == "Controles":
     if 'ano_controle' not in st.session_state:
         st.session_state['ano_controle'] = str(date.today().year)
 
-    # --- FILTRO DE ANO ---
+    # --- FILTRO DE ANO E MESES INTERATIVOS ---
     ano_atual = date.today().year
     lista_anos = [str(a) for a in range(ano_atual - 2, ano_atual + 4)]
     
@@ -280,13 +280,11 @@ elif aba_selecionada == "Controles":
         st.session_state['ano_controle'] = ano_selecionado
         st.rerun()
 
-    # --- BOTÕES DE MESES ---
     st.markdown("**Selecione o Mês:**")
     meses_dict = {"Jan": "01", "Fev": "02", "Mar": "03", "Abr": "04", "Mai": "05", "Jun": "06", 
                   "Jul": "07", "Ago": "08", "Set": "09", "Out": "10", "Nov": "11", "Dez": "12"}
     mes_nomes = list(meses_dict.keys())
     
-    # Grelha de botões 3x4 (excelente para telemóveis)
     for row in range(3):
         cols = st.columns(4)
         for col_idx in range(4):
@@ -294,7 +292,6 @@ elif aba_selecionada == "Controles":
             nome_mes = mes_nomes[idx]
             num_mes = meses_dict[nome_mes]
             
-            # Destaca o botão selecionado usando type="primary"
             is_selected = (st.session_state['mes_controle'] == num_mes)
             tipo_botao = "primary" if is_selected else "secondary"
             
@@ -302,85 +299,121 @@ elif aba_selecionada == "Controles":
                 st.session_state['mes_controle'] = num_mes
                 st.rerun()
 
-    # Constroi a string final usada para pesquisa no banco de dados (ex: "10/2026")
     mes_input = f"{st.session_state['mes_controle']}/{st.session_state['ano_controle']}"
+    mes_selecionado_dt = pd.to_datetime(mes_input, format='%m/%Y')
 
     st.divider()
-    st.subheader(f"Contas Pagas em {mes_input}")
+
+    # --- LÓGICA DE CONTAS FIXAS (CONFIGURADAS VS PAGAS) ---
+    df_setups = df_geral[df_geral['Tipo'] == 'Conta Fixa Setup']
+    df_pagas = df_geral[(df_geral['Tipo'] == 'Despesa Fixa') & (df_geral['Detalhe'] == mes_input)]
+    nomes_pagas = df_pagas['Categoria'].tolist()
+
+    contas_ativas_mes = []
     
-    df_contas_mes = df_geral[(df_geral['Tipo'] == 'Despesa Fixa') & (df_geral['Detalhe'] == mes_input)]
+    # Identifica quais contas configuradas estão ativas no mês selecionado
+    for _, row in df_setups.iterrows():
+        setup_dt = pd.to_datetime(row['Data'])
+        setup_mes_dt = pd.to_datetime(setup_dt.strftime('%m/%Y'), format='%m/%Y')
+        
+        diff_meses = (mes_selecionado_dt.year - setup_mes_dt.year) * 12 + (mes_selecionado_dt.month - setup_mes_dt.month)
+        
+        if diff_meses >= 0: # A conta já começou
+            if row['Detalhe'] == 'Indefinido':
+                contas_ativas_mes.append(row)
+            else:
+                try:
+                    duracao = int(row['Detalhe'])
+                    if diff_meses < duracao: # Ainda está dentro da duração
+                        contas_ativas_mes.append(row)
+                except:
+                    pass
+
+    # --- 1. EXIBIÇÃO DAS CONTAS PAGAS NO CARTÃO ---
+    st.subheader(f"✅ Contas Pagas em {mes_input}")
     
-    if not df_contas_mes.empty:
-        total_contas = df_contas_mes['Valor'].sum()
+    if not df_pagas.empty:
+        total_contas = df_pagas['Valor'].sum()
         
         html_contas = f"""
         <style>
-        .bill-card {{
-            background-color: #ffffff;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.04);
-            border: 1px solid #f8f9fa;
-            margin-bottom: 20px;
-        }}
-        @media (prefers-color-scheme: dark) {{
-            .bill-card {{ background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }}
-        }}
-        .bill-total {{
-            font-size: 18px; font-weight: 800; color: #339af0; text-align: center; margin-bottom: 20px;
-        }}
-        .bill-item {{
-            display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f3f5; font-size: 15px;
-        }}
+        .bill-card {{ background-color: #ffffff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); border: 1px solid #f8f9fa; margin-bottom: 20px; }}
+        @media (prefers-color-scheme: dark) {{ .bill-card {{ background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }} }}
+        .bill-total {{ font-size: 18px; font-weight: 800; color: #339af0; text-align: center; margin-bottom: 20px; }}
+        .bill-item {{ display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f3f5; font-size: 15px; }}
         @media (prefers-color-scheme: dark) {{ .bill-item {{ border-bottom: 1px solid #333; }} }}
         .bill-item:last-child {{ border-bottom: none; }}
         .bill-name {{ font-weight: 600; color: #555; }}
         @media (prefers-color-scheme: dark) {{ .bill-name {{ color: #ccc; }} }}
         .bill-value {{ font-weight: 700; color: #ff6b6b; }}
         </style>
-        
-        <div class="bill-card">
-            <div class="bill-total">💰 Total Pago: R$ {formatar_moeda(total_contas)}</div>
+        <div class="bill-card"><div class="bill-total">💰 Total Pago: R$ {formatar_moeda(total_contas)}</div>
         """
-        
-        for index, row in df_contas_mes.iterrows():
-            html_contas += f"""
-            <div class="bill-item">
-                <span class="bill-name">✅ {row['Categoria']}</span>
-                <span class="bill-value">R$ {formatar_moeda(row['Valor'])}</span>
-            </div>
-            """
-            
+        for index, row in df_pagas.iterrows():
+            html_contas += f'<div class="bill-item"><span class="bill-name">✅ {row["Categoria"]}</span><span class="bill-value">R$ {formatar_moeda(row["Valor"])}</span></div>'
         html_contas += "</div>"
         st.markdown(html_contas, unsafe_allow_html=True)
-        
     else:
-        st.info("Nenhuma conta registada para este mês.")
+        st.info("Nenhuma conta registada como paga este mês.")
+
+    # --- 2. CONTAS PENDENTES PARA PAGAR NESTE MÊS ---
+    contas_pendentes = [c for c in contas_ativas_mes if c['Categoria'] not in nomes_pagas]
+    
+    st.subheader(f"⏳ Contas Pendentes")
+    if contas_pendentes:
+        for p in contas_pendentes:
+            with st.form(f"pagar_{p['Categoria']}"):
+                colA, colB, colC = st.columns([2, 1, 1])
+                with colA:
+                    st.markdown(f"<div style='margin-top: 5px; font-weight: bold;'>{p['Categoria']}</div>", unsafe_allow_html=True)
+                    st.caption(f"Previsto: R$ {formatar_moeda(p['Valor'])}")
+                with colB:
+                    valor_pago = st.number_input("Valor Pago", value=float(p['Valor']), min_value=0.0, step=10.0, key=f"val_{p['Categoria']}")
+                with colC:
+                    if st.form_submit_button("Pagar", use_container_width=True):
+                        nova_conta = pd.DataFrame({
+                            "Data": [date.today().strftime("%Y-%m-%d")],
+                            "Tipo": ["Despesa Fixa"],
+                            "Categoria": [p['Categoria']],
+                            "Detalhe": [mes_input],
+                            "Valor": [valor_pago]
+                        })
+                        df_geral = pd.concat([df_geral, nova_conta], ignore_index=True)
+                        salvar_dados(df_geral)
+                        st.rerun()
+    else:
+        if contas_ativas_mes:
+            st.success("🎉 Todas as contas previstas para este mês estão pagas!")
+        else:
+            st.info("Não há contas fixas ativas pendentes.")
 
     st.divider()
-    st.subheader(f"Registar Nova Conta para {mes_input}")
-    with st.form("form_nova_conta"):
-        col1, col2 = st.columns(2)
-        with col1:
-            conta_sugestao = st.selectbox("Selecione a Conta", ["Apartamento", "Evolução de obra", "Moto/Carro", "Faculdade", "Outra..."])
-        with col2:
-            conta_personalizada = st.text_input("Se escolheu 'Outra...', digite o nome:")
-            
-        valor_conta = st.number_input("Valor Pago (R$)", min_value=0.0, step=10.0, format="%.2f")
+
+    # --- 3. CONFIGURAR NOVA CONTA FIXA ---
+    st.subheader("⚙️ Configurar Nova Conta Fixa")
+    st.write("Adicione despesas que se repetem (como renda, luz, prestações). O sistema lembrará de cobrá-las nos meses adequados.")
+
+    with st.form("form_setup_conta"):
+        nome_conta = st.text_input("Nome da Conta (ex: Internet, Mensalidade)")
+        valor_estimado = st.number_input("Valor Estimado (R$)", min_value=0.0, step=10.0, format="%.2f")
         
-        if st.form_submit_button("Salvar Pagamento", use_container_width=True):
-            nome_final = conta_personalizada if conta_sugestao == "Outra..." else conta_sugestao
-            if nome_final and valor_conta > 0:
-                nova_conta = pd.DataFrame({
+        indefinido = st.checkbox("Cobrar para sempre (Indefinido)", value=True)
+        duracao = st.number_input("Duração (meses)", min_value=1, value=12, step=1, disabled=indefinido)
+        
+        if st.form_submit_button("Salvar Configuração de Conta", use_container_width=True):
+            if nome_conta and valor_estimado > 0:
+                detalhe_duracao = "Indefinido" if indefinido else str(duracao)
+                
+                novo_setup = pd.DataFrame({
                     "Data": [date.today().strftime("%Y-%m-%d")],
-                    "Tipo": ["Despesa Fixa"],
-                    "Categoria": [nome_final],
-                    "Detalhe": [mes_input],
-                    "Valor": [valor_conta]
+                    "Tipo": ["Conta Fixa Setup"],
+                    "Categoria": [nome_conta],
+                    "Detalhe": [detalhe_duracao],
+                    "Valor": [valor_estimado]
                 })
-                df_geral = pd.concat([df_geral, nova_conta], ignore_index=True)
+                df_geral = pd.concat([df_geral, novo_setup], ignore_index=True)
                 salvar_dados(df_geral)
-                st.success(f"✅ Conta '{nome_final}' de R$ {formatar_moeda(valor_conta)} registada para {mes_input}!")
+                st.success(f"✅ Conta fixa '{nome_conta}' configurada com sucesso!")
                 st.rerun()
             else:
-                st.error("Por favor, informe o nome da conta e um valor maior que zero.")
+                st.error("Preencha o nome e o valor estimado para configurar a conta.")
