@@ -20,7 +20,7 @@ with st.sidebar:
         options=["Painel", "Lançamentos", "Banco de Dados"],
         icons=["bar-chart-line-fill", "plus-circle-fill", "database-fill"],
         menu_icon="wallet-fill",
-        default_index=2, # Abrirá direto no Banco de Dados para você testar
+        default_index=1, # Abre direto nos Lançamentos
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
@@ -69,7 +69,6 @@ elif aba_selecionada == "Lançamentos":
                         "Categoria": [categoria_entrada],
                         "Valor": [valor_entrada]
                     })
-                    # Adiciona a nova entrada ao Banco de Dados
                     st.session_state['dados'] = pd.concat([st.session_state['dados'], nova_linha], ignore_index=True)
                     st.success(f"✅ Entrada de R$ {valor_entrada:.2f} salva com sucesso!")
                 else:
@@ -81,30 +80,29 @@ elif aba_selecionada == "Lançamentos":
             st.subheader("Nova Despesa")
             data_saida = st.date_input("Data da Saída", date.today())
             
-            # Deixei um campo de texto provisório. Podemos colocar as opções do seu arquivo aqui depois.
-            categoria_saida = st.text_input("Categoria da Despesa")
+            # Nova caixa de seleção com as suas categorias de saída
+            categoria_saida = st.selectbox("Categoria", ["Apartamento", "Moto ou Carro", "Estudos", "Lazer", "Cartão"])
+            
             valor_saida = st.number_input("Valor (R$)", min_value=0.0, format="%.2f")
             
             if st.form_submit_button("Salvar Saída", use_container_width=True):
-                if valor_saida > 0 and categoria_saida != "":
+                if valor_saida > 0:
                     nova_linha = pd.DataFrame({
                         "Data": [data_saida.strftime("%Y-%m-%d")],
                         "Tipo": ["Despesa"],
                         "Categoria": [categoria_saida],
                         "Valor": [valor_saida]
                     })
-                    # Adiciona a nova saída ao Banco de Dados
                     st.session_state['dados'] = pd.concat([st.session_state['dados'], nova_linha], ignore_index=True)
-                    st.success(f"✅ Saída de R$ {valor_saida:.2f} salva com sucesso!")
+                    st.success(f"✅ Saída de R$ {valor_saida:.2f} ({categoria_saida}) salva com sucesso!")
                 else:
-                    st.error("Preencha a categoria e insira um valor maior que zero.")
+                    st.error("O valor precisa ser maior que zero.")
 
 # --- ABA 3: BANCO DE DADOS ---
 elif aba_selecionada == "Banco de Dados":
     st.title("🗄️ Banco de Dados")
     st.write("Visualize, exporte e importe todos os seus registros.")
 
-    # Exibe a tabela atual se houver dados
     if not st.session_state['dados'].empty:
         st.dataframe(st.session_state['dados'], use_container_width=True, hide_index=True)
     else:
@@ -112,7 +110,6 @@ elif aba_selecionada == "Banco de Dados":
 
     st.divider()
 
-    # -- SEÇÃO DE EXPORTAÇÃO --
     st.subheader("📤 Exportar Dados")
     st.write("Baixe tudo o que você cadastrou para uma planilha de Excel/CSV.")
     csv = st.session_state['dados'].to_csv(index=False).encode('utf-8')
@@ -126,7 +123,6 @@ elif aba_selecionada == "Banco de Dados":
 
     st.divider()
 
-    # -- SEÇÃO DE IMPORTAÇÃO --
     st.subheader("📥 Importar Dados")
     st.write("Envie uma planilha CSV antiga para dentro do aplicativo.")
     arquivo_upload = st.file_uploader("Escolha um arquivo .CSV", type=["csv"])
@@ -135,10 +131,9 @@ elif aba_selecionada == "Banco de Dados":
         try:
             df_importado = pd.read_csv(arquivo_upload)
             
-            # Botão de confirmação para evitar substituições acidentais
             if st.button("Substituir dados atuais pela planilha", use_container_width=True):
                 st.session_state['dados'] = df_importado
                 st.success("Dados importados com sucesso!")
-                st.rerun() # Atualiza a tela para exibir a nova tabela
+                st.rerun() 
         except Exception as e:
             st.error("Erro ao ler o arquivo. Certifique-se de que é um formato CSV válido.")
