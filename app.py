@@ -4,12 +4,14 @@ from streamlit_option_menu import option_menu
 from datetime import date
 import plotly.express as px
 import os
+import json
 
 # Configuração da página para celular
 st.set_page_config(page_title="Controle Financeiro", layout="centered", initial_sidebar_state="expanded")
 
-# --- SISTEMA DE ARMAZENAMENTO FÍSICO ---
+# --- SISTEMAS DE ARMAZENAMENTO FÍSICO ---
 ARQUIVO_DADOS = "meu_banco_de_dados.csv"
+ARQUIVO_CONTROLES = "meus_controles.json"
 
 def carregar_dados():
     if os.path.exists(ARQUIVO_DADOS):
@@ -20,6 +22,20 @@ def carregar_dados():
 def salvar_dados(df):
     df.to_csv(ARQUIVO_DADOS, index=False)
 
+def carregar_controles():
+    if os.path.exists(ARQUIVO_CONTROLES):
+        with open(ARQUIVO_CONTROLES, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    # Contas padrão iniciais
+    return {
+        "contas_pagas": {"Apartamento/Aluguel": False, "Condomínio": False, "Energia Elétrica": False, "Internet": False, "Fatura do Cartão": False},
+        "metas_investimento": {"Reserva de Emergência": 0.0, "CDB / Tesouro Direto": 0.0, "Ações / FIIs": 0.0}
+    }
+
+def salvar_controles(dados):
+    with open(ARQUIVO_CONTROLES, 'w', encoding='utf-8') as f:
+        json.dump(dados, f, ensure_ascii=False, indent=4)
+
 def formatar_moeda(valor):
     return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
@@ -29,28 +45,21 @@ with st.sidebar:
     
     aba_selecionada = option_menu(
         menu_title="Meu Financeiro",
-        options=["Painel", "Lançamentos", "Controles"], # Removido o Banco de Dados daqui
+        options=["Painel", "Lançamentos", "Controles"],
         icons=["bar-chart-line-fill", "plus-circle-fill", "sliders"],
         menu_icon="wallet-fill",
-        default_index=1, 
+        default_index=2, # Abre direto nos Controles para você testar
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
-            "nav-link": {
-                "font-size": "16px", "text-align": "left", "margin": "10px 0px",     
-                "padding": "12px", "border-radius": "0px", "--hover-color": "#f0f2f6"
-            },
-            "nav-link-selected": {
-                "background-color": "#28a745", "color": "white", 
-                "font-weight": "bold", "border-radius": "0px"    
-            },
+            "nav-link": {"font-size": "16px", "text-align": "left", "margin": "10px 0px", "padding": "12px", "border-radius": "0px", "--hover-color": "#f0f2f6"},
+            "nav-link-selected": {"background-color": "#28a745", "color": "white", "font-weight": "bold", "border-radius": "0px"},
         }
     )
 
 # --- ABA 1: PAINEL ---
 if aba_selecionada == "Painel":
     st.title("📊 Painel")
-    
     df_completo = carregar_dados()
     
     if df_completo.empty:
@@ -72,29 +81,17 @@ if aba_selecionada == "Painel":
         total_saidas = df_filtrado[df_filtrado['Tipo'] == 'Despesa']['Valor'].sum()
         liquido = total_entradas - total_saidas
 
-        # --- DESIGN DOS BALÕES ---
         html_cards = f"""
         <style>
-        .cards-wrapper {{
-            display: flex; flex-direction: row; justify-content: space-between; gap: 10px;
-            margin-top: 10px; margin-bottom: 25px; overflow-x: auto; padding-bottom: 10px; 
-        }}
+        .cards-wrapper {{ display: flex; flex-direction: row; justify-content: space-between; gap: 10px; margin-top: 10px; margin-bottom: 25px; overflow-x: auto; padding-bottom: 10px; }}
         .cards-wrapper::-webkit-scrollbar {{ display: none; }}
         .cards-wrapper {{ -ms-overflow-style: none; scrollbar-width: none; }}
-        .card-custom {{
-            flex: 1; min-width: 95px; background-color: #ffffff; border-radius: 16px; padding: 15px 5px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.04); display: flex; flex-direction: column;
-            align-items: center; justify-content: center; border: 1px solid #f8f9fa; transition: transform 0.2s ease;
-        }}
-        @media (prefers-color-scheme: dark) {{
-            .card-custom {{ background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }}
-        }}
+        .card-custom {{ flex: 1; min-width: 95px; background-color: #ffffff; border-radius: 16px; padding: 15px 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #f8f9fa; transition: transform 0.2s ease; }}
+        @media (prefers-color-scheme: dark) {{ .card-custom {{ background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }} }}
         .card-icon {{ font-size: 22px; margin-bottom: 4px; }}
         .card-title {{ font-size: 11px; color: #888; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; text-align: center; }}
         .card-value {{ font-size: 16px; font-weight: 800; text-align: center; }}
-        .text-green {{ color: #20c997; }}
-        .text-red {{ color: #ff6b6b; }}
-        .text-blue {{ color: #339af0; }}
+        .text-green {{ color: #20c997; }} .text-red {{ color: #ff6b6b; }} .text-blue {{ color: #339af0; }}
         </style>
         <div class="cards-wrapper">
             <div class="card-custom"><div class="card-icon">📈</div><div class="card-title">Entradas</div><div class="card-value text-green">R$ {formatar_moeda(total_entradas)}</div></div>
@@ -106,13 +103,8 @@ if aba_selecionada == "Painel":
 
         st.markdown("""
         <style>
-        [data-testid="stColumn"] {
-            background-color: #ffffff; border-radius: 20px; padding: 20px 10px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); border: 1px solid #f0f2f6; margin-bottom: 15px;
-        }
-        @media (prefers-color-scheme: dark) {
-            [data-testid="stColumn"] { background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); }
-        }
+        [data-testid="stColumn"] { background-color: #ffffff; border-radius: 20px; padding: 20px 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); border: 1px solid #f0f2f6; margin-bottom: 15px; }
+        @media (prefers-color-scheme: dark) { [data-testid="stColumn"] { background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); } }
         </style>
         """, unsafe_allow_html=True)
         
@@ -149,14 +141,8 @@ if aba_selecionada == "Painel":
             st.markdown("<h4 style='text-align: center; color: #666; font-size: 15px; font-weight: 700; margin-bottom: 10px;'>Comparativo Anual</h4>", unsafe_allow_html=True)
             df_agrupado = df_completo.groupby(['MesAno', 'Tipo'], as_index=False)['Valor'].sum()
             df_agrupado['Tipo'] = df_agrupado['Tipo'].replace({'Receita': 'Entradas', 'Despesa': 'Saídas'})
-            
             fig3 = px.bar(df_agrupado, x='MesAno', y='Valor', color='Tipo', barmode='group', color_discrete_map={"Entradas": "#20c997", "Saídas": "#ff6b6b"})
-            fig3.update_layout(
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                margin=dict(t=10, b=10, l=0, r=0), height=240,
-                legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5, title=""),
-                xaxis_title="", yaxis_title=""
-            )
+            fig3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=10, b=10, l=0, r=0), height=240, legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5, title=""), xaxis_title="", yaxis_title="")
             fig3.update_xaxes(showgrid=False)
             fig3.update_yaxes(showgrid=True, gridcolor='rgba(200,200,200,0.1)')
             st.plotly_chart(fig3, use_container_width=True)
@@ -167,19 +153,14 @@ if aba_selecionada == "Painel":
             if 'Receita' not in df_pivot.columns: df_pivot['Receita'] = 0
             if 'Despesa' not in df_pivot.columns: df_pivot['Despesa'] = 0
             df_pivot['Guardado'] = df_pivot['Receita'] - df_pivot['Despesa']
-            
             fig4 = px.bar(df_pivot, x='MesAno', y='Guardado')
             fig4.update_traces(marker_color='#b197fc')
-            fig4.update_layout(
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                margin=dict(t=10, b=10, l=0, r=0), height=240,
-                xaxis_title="", yaxis_title=""
-            )
+            fig4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=10, b=10, l=0, r=0), height=240, xaxis_title="", yaxis_title="")
             fig4.update_xaxes(showgrid=False)
             fig4.update_yaxes(showgrid=True, gridcolor='rgba(200,200,200,0.1)')
             st.plotly_chart(fig4, use_container_width=True)
 
-# --- ABA 2: LANÇAMENTOS (AGORA COM BANCO DE DADOS) ---
+# --- ABA 2: LANÇAMENTOS ---
 elif aba_selecionada == "Lançamentos":
     st.title("➕ Lançamentos")
     st.write("Registre e consulte suas movimentações financeiras.")
@@ -219,7 +200,6 @@ elif aba_selecionada == "Lançamentos":
     with aba_banco:
         st.subheader("Consultar Registos")
         df_banco = carregar_dados()
-        
         if not df_banco.empty:
             st.dataframe(df_banco, use_container_width=True, hide_index=True)
         else:
@@ -240,7 +220,66 @@ elif aba_selecionada == "Lançamentos":
                 st.success("Dados importados e salvos com sucesso!")
                 st.rerun()
 
-# --- ABA 3: CONTROLES ---
+# --- ABA 3: CONTROLES (NOVA ESTRUTURA) ---
 elif aba_selecionada == "Controles":
     st.title("⚙️ Controles")
-    st.info("🚧 Tela em desenvolvimento.")
+    st.write("Acompanhe o pagamento das suas contas e planeie os seus investimentos.")
+
+    controles = carregar_controles()
+
+    aba_contas, aba_invest = st.tabs(["Contas do Mês ✅", "Investimentos Planejados 🚀"])
+
+    with aba_contas:
+        st.subheader("Checklist de Pagamentos")
+        st.info("Marque as contas que já foram pagas neste mês. As alterações são salvas automaticamente.")
+        
+        # Cria as caixas de seleção dinamicamente
+        for conta, status in controles["contas_pagas"].items():
+            novo_status = st.checkbox(conta, value=status, key=f"chk_{conta}")
+            controles["contas_pagas"][conta] = novo_status
+            
+        salvar_controles(controles)
+
+        # Barra de Progresso Visual
+        total_contas = len(controles["contas_pagas"])
+        contas_pagas = sum(controles["contas_pagas"].values())
+        
+        if total_contas > 0:
+            percentual = contas_pagas / total_contas
+            st.progress(percentual, text=f"Progresso: {contas_pagas} de {total_contas} contas pagas")
+            
+            if percentual == 1.0:
+                st.success("🎉 Parabéns! Todas as contas fixas foram pagas este mês.")
+
+        # Botão para adicionar nova conta na lista
+        st.divider()
+        nova_conta = st.text_input("Adicionar nova conta à lista:")
+        if st.button("Adicionar Conta", use_container_width=True):
+            if nova_conta and nova_conta not in controles["contas_pagas"]:
+                controles["contas_pagas"][nova_conta] = False
+                salvar_controles(controles)
+                st.rerun()
+
+    with aba_invest:
+        st.subheader("Metas de Investimento")
+        st.write("Defina o valor que pretende guardar para cada objetivo financeiro.")
+        
+        # Cria os campos de preenchimento dinamicamente
+        for invest, valor in controles["metas_investimento"].items():
+            novo_valor = st.number_input(f"Meta para {invest} (R$)", value=float(valor), min_value=0.0, step=50.0, format="%.2f", key=f"inv_{invest}")
+            controles["metas_investimento"][invest] = novo_valor
+            
+        salvar_controles(controles)
+
+        # Cálculo do total de investimentos
+        total_investimentos = sum(controles["metas_investimento"].values())
+        st.info(f"🎯 O seu objetivo total de investimentos é: **R$ {formatar_moeda(total_investimentos)}**")
+
+        # Botão para adicionar novo investimento
+        st.divider()
+        novo_invest = st.text_input("Adicionar nova categoria de investimento:")
+        if st.button("Adicionar Categoria", use_container_width=True):
+            if novo_invest and novo_invest not in controles["metas_investimento"]:
+                controles["metas_investimento"][novo_invest] = 0.0
+                salvar_controles(controles)
+                st.rerun()
