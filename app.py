@@ -25,7 +25,11 @@ def salvar_dados(df):
 def carregar_controles():
     if os.path.exists(ARQUIVO_CONTROLES):
         with open(ARQUIVO_CONTROLES, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            dados = json.load(f)
+            # Garante que as chaves essenciais existam para evitar erros
+            if "contas_pagas" not in dados: dados["contas_pagas"] = {}
+            if "investimentos" not in dados: dados["investimentos"] = {"Reserva de Emergência": 0.0, "CDB / Tesouro": 0.0, "Ações / FIIs": 0.0}
+            return dados
     return {
         "contas_pagas": {},
         "investimentos": {"Reserva de Emergência": 0.0, "CDB / Tesouro": 0.0, "Ações / FIIs": 0.0}
@@ -47,7 +51,7 @@ with st.sidebar:
         options=["Painel", "Lançamentos", "Controles"],
         icons=["bar-chart-line-fill", "plus-circle-fill", "sliders"],
         menu_icon="wallet-fill",
-        default_index=2, # Abre direto nos Controles para você testar
+        default_index=2, # Abre direto nos Controles
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
@@ -273,11 +277,9 @@ elif aba_selecionada == "Controles":
         st.subheader("Meus Investimentos")
         st.write("Acompanhe o saldo atual de cada objetivo em formato de balões.")
 
-        # --- EXIBIÇÃO DOS BALÕES DE INVESTIMENTO ---
-        investimentos_dict = controles["investimentos"]
+        investimentos_dict = controles.get("investimentos", {})
         
         if investimentos_dict:
-            # Monta o HTML estilo balões para os investimentos
             html_inv_cards = """
             <style>
             .inv-wrapper { display: flex; flex-direction: row; justify-content: space-between; gap: 10px; margin-top: 10px; margin-bottom: 25px; overflow-x: auto; padding-bottom: 10px; }
@@ -305,12 +307,10 @@ elif aba_selecionada == "Controles":
 
         st.divider()
 
-        # --- FORMULÁRIO PARA ATUALIZAR / INSERIR VALORES A QUALQUER MOMENTO ---
         st.subheader("Atualizar Saldo de Investimento")
         with st.form("form_atualiza_investimento"):
             inv_escolhido = st.selectbox("Escolha a categoria", list(investimentos_dict.keys()))
             
-            # Opção de somar ou definir o valor exato
             tipo_operacao = st.radio("Ação", ["Adicionar (Depositar)", "Definir Valor Exato"], horizontal=True)
             valor_movimento = st.number_input("Valor (R$)", min_value=0.0, step=50.0, format="%.2f")
             
@@ -325,7 +325,6 @@ elif aba_selecionada == "Controles":
                     st.success(f"✅ Saldo de '{inv_escolhido}' atualizado com sucesso!")
                     st.rerun()
 
-        # --- ADICIONAR NOVA CATEGORIA DE INVESTIMENTO ---
         st.divider()
         st.subheader("Nova Categoria")
         novo_invest = st.text_input("Nome do novo investimento (ex: Tesouro Direto):")
