@@ -38,7 +38,7 @@ with st.sidebar:
         options=["Painel", "Lançamentos", "Controles"],
         icons=["bar-chart-line-fill", "plus-circle-fill", "sliders"],
         menu_icon="wallet-fill",
-        default_index=2, 
+        default_index=1, 
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
             "icon": {"color": "#555", "font-size": "20px"}, 
@@ -158,12 +158,12 @@ if aba_selecionada == "Painel":
             else:
                 st.info("Ainda não há histórico de investimentos.")
 
-# --- ABA 2: LANÇAMENTOS E BASE DE DADOS ---
+# --- ABA 2: LANÇAMENTOS, INVESTIMENTOS E BASE DE DADOS ---
 elif aba_selecionada == "Lançamentos":
     st.title("➕ Lançamentos e Base")
-    st.write("Registe as suas entradas e saídas diárias variadas.")
+    st.write("Registe as suas entradas, saídas e acompanhe os seus investimentos.")
 
-    aba_entrada, aba_saida, aba_banco = st.tabs(["Entradas 📈", "Saídas 📉", "Base de Dados 🗄️"])
+    aba_entrada, aba_saida, aba_invest, aba_banco = st.tabs(["Entradas 📈", "Saídas 📉", "Investimentos 🚀", "Base de Dados 🗄️"])
 
     with aba_entrada:
         with st.form("form_entrada"):
@@ -195,30 +195,10 @@ elif aba_selecionada == "Lançamentos":
                     salvar_dados(df)
                     st.success("✅ Despesa registada no Banco de Dados!")
 
-    with aba_banco:
-        st.subheader("Base de Dados Completa")
-        df_banco = carregar_dados()
-        if not df_banco.empty:
-            st.dataframe(df_banco, use_container_width=True, hide_index=True)
-        else:
-            st.info("Ainda sem registos.")
-
-        st.divider()
-        st.subheader("📤 Exportar para Google Planilhas")
-        csv = df_banco.to_csv(index=False).encode('utf-8')
-        st.download_button(label="📥 Baixar Ficheiro Consolidado (CSV)", data=csv, file_name="meu_controle_financeiro_geral.csv", mime="text/csv", use_container_width=True)
-
-# --- ABA 3: CONTROLES ---
-elif aba_selecionada == "Controles":
-    st.title("⚙️ Controles")
-    df_geral = carregar_dados()
-
-    aba_invest, aba_contas = st.tabs(["Meus Investimentos 🚀", "Contas do Mês ✅"])
-
     with aba_invest:
         st.subheader("Gestão de Investimentos")
-        st.write("Acompanhe e atualize os seus investimentos ao longo do tempo.")
-
+        df_geral = carregar_dados()
+        
         inv_names = df_geral[df_geral['Tipo'].isin(['Meta', 'Investimento'])]['Categoria'].unique()
 
         if len(inv_names) > 0:
@@ -266,86 +246,102 @@ elif aba_selecionada == "Controles":
                         st.success(f"✅ Saldo de '{inv_escolhido}' atualizado para R$ {formatar_moeda(novo_saldo)}!")
                         st.rerun()
 
-    with aba_contas:
-        mes_atual_str = date.today().strftime('%m/%Y')
-        mes_input = st.text_input("Mês de Referência (MM/AAAA)", value=mes_atual_str)
-        st.subheader(f"Contas Pagas em {mes_input}")
-        
-        df_contas_mes = df_geral[(df_geral['Tipo'] == 'Despesa Fixa') & (df_geral['Detalhe'] == mes_input)]
-        
-        if not df_contas_mes.empty:
-            total_contas = df_contas_mes['Valor'].sum()
-            
-            # --- DESIGN DO CARTÃO DE CONTAS PAGAS ---
-            html_contas = f"""
-            <style>
-            .bill-card {{
-                background-color: #ffffff;
-                border-radius: 16px;
-                padding: 20px;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.04);
-                border: 1px solid #f8f9fa;
-                margin-bottom: 20px;
-            }}
-            @media (prefers-color-scheme: dark) {{
-                .bill-card {{ background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }}
-            }}
-            .bill-total {{
-                font-size: 18px; font-weight: 800; color: #339af0; text-align: center; margin-bottom: 20px;
-            }}
-            .bill-item {{
-                display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f3f5; font-size: 15px;
-            }}
-            @media (prefers-color-scheme: dark) {{ .bill-item {{ border-bottom: 1px solid #333; }} }}
-            .bill-item:last-child {{ border-bottom: none; }}
-            .bill-name {{ font-weight: 600; color: #555; }}
-            @media (prefers-color-scheme: dark) {{ .bill-name {{ color: #ccc; }} }}
-            .bill-value {{ font-weight: 700; color: #ff6b6b; }}
-            </style>
-            
-            <div class="bill-card">
-                <div class="bill-total">💰 Total Pago: R$ {formatar_moeda(total_contas)}</div>
-            """
-            
-            # Adiciona cada conta dentro do cartão HTML
-            for index, row in df_contas_mes.iterrows():
-                html_contas += f"""
-                <div class="bill-item">
-                    <span class="bill-name">✅ {row['Categoria']}</span>
-                    <span class="bill-value">R$ {formatar_moeda(row['Valor'])}</span>
-                </div>
-                """
-                
-            html_contas += "</div>"
-            st.markdown(html_contas, unsafe_allow_html=True)
-            
+    with aba_banco:
+        st.subheader("Base de Dados Completa")
+        df_banco = carregar_dados()
+        if not df_banco.empty:
+            st.dataframe(df_banco, use_container_width=True, hide_index=True)
         else:
-            st.info("Nenhuma conta registada para este mês.")
+            st.info("Ainda sem registos.")
 
         st.divider()
-        st.subheader("Registar Nova Conta do Mês")
-        with st.form("form_nova_conta"):
-            col1, col2 = st.columns(2)
-            with col1:
-                conta_sugestao = st.selectbox("Selecione a Conta", ["Apartamento", "Evolução de obra", "Moto/Carro", "Faculdade", "Outra..."])
-            with col2:
-                conta_personalizada = st.text_input("Se escolheu 'Outra...', digite o nome:")
-                
-            valor_conta = st.number_input("Valor Pago (R$)", min_value=0.0, step=10.0, format="%.2f")
+        st.subheader("📤 Exportar para Google Planilhas")
+        csv = df_banco.to_csv(index=False).encode('utf-8')
+        st.download_button(label="📥 Baixar Ficheiro Consolidado (CSV)", data=csv, file_name="meu_controle_financeiro_geral.csv", mime="text/csv", use_container_width=True)
+
+# --- ABA 3: CONTROLES DE CONTAS MENSAIS ---
+elif aba_selecionada == "Controles":
+    st.title("⚙️ Controles de Contas")
+    st.write("Acompanhe e registe o pagamento das suas contas fixas mensais.")
+    df_geral = carregar_dados()
+
+    mes_atual_str = date.today().strftime('%m/%Y')
+    mes_input = st.text_input("Mês de Referência (MM/AAAA)", value=mes_atual_str)
+    st.subheader(f"Contas Pagas em {mes_input}")
+    
+    df_contas_mes = df_geral[(df_geral['Tipo'] == 'Despesa Fixa') & (df_geral['Detalhe'] == mes_input)]
+    
+    if not df_contas_mes.empty:
+        total_contas = df_contas_mes['Valor'].sum()
+        
+        html_contas = f"""
+        <style>
+        .bill-card {{
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+            border: 1px solid #f8f9fa;
+            margin-bottom: 20px;
+        }}
+        @media (prefers-color-scheme: dark) {{
+            .bill-card {{ background-color: #1a1a1a; border: 1px solid #2d2d2d; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }}
+        }}
+        .bill-total {{
+            font-size: 18px; font-weight: 800; color: #339af0; text-align: center; margin-bottom: 20px;
+        }}
+        .bill-item {{
+            display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f3f5; font-size: 15px;
+        }}
+        @media (prefers-color-scheme: dark) {{ .bill-item {{ border-bottom: 1px solid #333; }} }}
+        .bill-item:last-child {{ border-bottom: none; }}
+        .bill-name {{ font-weight: 600; color: #555; }}
+        @media (prefers-color-scheme: dark) {{ .bill-name {{ color: #ccc; }} }}
+        .bill-value {{ font-weight: 700; color: #ff6b6b; }}
+        </style>
+        
+        <div class="bill-card">
+            <div class="bill-total">💰 Total Pago: R$ {formatar_moeda(total_contas)}</div>
+        """
+        
+        for index, row in df_contas_mes.iterrows():
+            html_contas += f"""
+            <div class="bill-item">
+                <span class="bill-name">✅ {row['Categoria']}</span>
+                <span class="bill-value">R$ {formatar_moeda(row['Valor'])}</span>
+            </div>
+            """
             
-            if st.form_submit_button("Salvar Pagamento", use_container_width=True):
-                nome_final = conta_personalizada if conta_sugestao == "Outra..." else conta_sugestao
-                if nome_final and valor_conta > 0:
-                    nova_conta = pd.DataFrame({
-                        "Data": [date.today().strftime("%Y-%m-%d")],
-                        "Tipo": ["Despesa Fixa"],
-                        "Categoria": [nome_final],
-                        "Detalhe": [mes_input],
-                        "Valor": [valor_conta]
-                    })
-                    df_geral = pd.concat([df_geral, nova_conta], ignore_index=True)
-                    salvar_dados(df_geral)
-                    st.success(f"✅ Conta '{nome_final}' de R$ {formatar_moeda(valor_conta)} registada com sucesso!")
-                    st.rerun()
-                else:
-                    st.error("Por favor, informe o nome da conta e um valor maior que zero.")
+        html_contas += "</div>"
+        st.markdown(html_contas, unsafe_allow_html=True)
+        
+    else:
+        st.info("Nenhuma conta registada para este mês.")
+
+    st.divider()
+    st.subheader("Registar Nova Conta do Mês")
+    with st.form("form_nova_conta"):
+        col1, col2 = st.columns(2)
+        with col1:
+            conta_sugestao = st.selectbox("Selecione a Conta", ["Apartamento", "Evolução de obra", "Moto/Carro", "Faculdade", "Outra..."])
+        with col2:
+            conta_personalizada = st.text_input("Se escolheu 'Outra...', digite o nome:")
+            
+        valor_conta = st.number_input("Valor Pago (R$)", min_value=0.0, step=10.0, format="%.2f")
+        
+        if st.form_submit_button("Salvar Pagamento", use_container_width=True):
+            nome_final = conta_personalizada if conta_sugestao == "Outra..." else conta_sugestao
+            if nome_final and valor_conta > 0:
+                nova_conta = pd.DataFrame({
+                    "Data": [date.today().strftime("%Y-%m-%d")],
+                    "Tipo": ["Despesa Fixa"],
+                    "Categoria": [nome_final],
+                    "Detalhe": [mes_input],
+                    "Valor": [valor_conta]
+                })
+                df_geral = pd.concat([df_geral, nova_conta], ignore_index=True)
+                salvar_dados(df_geral)
+                st.success(f"✅ Conta '{nome_final}' de R$ {formatar_moeda(valor_conta)} registada com sucesso!")
+                st.rerun()
+            else:
+                st.error("Por favor, informe o nome da conta e um valor maior que zero.")
